@@ -66,6 +66,9 @@
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding StatusDisplay}" Value="PAUSED">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.45"/>
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bd" Property="BorderBrush" Value="#3A4E7E"/>
                             </Trigger>
@@ -151,8 +154,19 @@
                             <TextBlock Grid.Column="3" Text="{Binding ModeDisplay}" Foreground="{StaticResource AccentBrush}"
                                        FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
 
-                            <TextBlock Grid.Column="4" Text="{Binding LatencyDisplay}" Foreground="{StaticResource TextBrush}"
-                                       FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="4" Text="{Binding LatencyDisplay}"
+                                       FontFamily="Consolas" FontSize="12" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StatusDisplay}" Value="OFFLINE">
+                                                <Setter Property="Foreground" Value="{StaticResource OfflineBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
 
                             <StackPanel Grid.Column="5" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding LastCheckedDisplay}" Foreground="{StaticResource TextDimBrush}"

@@ -29,7 +29,8 @@ public partial class MainWindow : Window
         foreach (var host in _settings.Hosts)
         {
             _hosts.Add(host);
-            _monitor.Start(host);
+            if (host.Enabled)
+                _monitor.Start(host);
         }
 
         HostList.ItemsSource = _hosts;
@@ -162,14 +163,37 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true && dialog.Result != null)
         {
             _hosts.Add(dialog.Result);
-            _monitor.Start(dialog.Result);
+            if (dialog.Result.Enabled)
+                _monitor.Start(dialog.Result);
             SaveSettings();
         }
     }
 
     private void Edit_Click(object sender, RoutedEventArgs e) => EditSelected();
 
-    private void HostList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => EditSelected();
+    // Double-click a row = edit that row; double-click empty space = add.
+    // (Selection alone can't tell these apart — a selected row stays selected
+    // when you click the background.)
+    private void HostList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        var element = e.OriginalSource as DependencyObject;
+        while (element != null && element is not System.Windows.Controls.ListBoxItem)
+        {
+            element = element is System.Windows.Media.Visual
+                ? System.Windows.Media.VisualTreeHelper.GetParent(element)
+                : LogicalTreeHelper.GetParent(element);
+        }
+
+        if (element is System.Windows.Controls.ListBoxItem { DataContext: HostEntry host })
+        {
+            HostList.SelectedItem = host;
+            EditSelected();
+        }
+        else
+        {
+            Add_Click(sender, e);
+        }
+    }
 
     private void EditSelected()
     {
@@ -184,12 +208,23 @@ public partial class MainWindow : Window
             host.Port = dialog.Result.Port;
             host.IntervalSeconds = dialog.Result.IntervalSeconds;
             host.RetryCount = dialog.Result.RetryCount;
+            host.TimeoutMs = dialog.Result.TimeoutMs;
             host.PlaySound = dialog.Result.PlaySound;
             host.OfflineColor = dialog.Result.OfflineColor;
             host.OnlineColor = dialog.Result.OnlineColor;
+            host.Enabled = dialog.Result.Enabled;
             host.Status = HostStatus.Unknown;
             host.LatencyMs = -1;
-            _monitor.Start(host); // restart loop with new parameters
+            host.LastFailure = null;
+            if (host.Enabled)
+            {
+                _monitor.Start(host); // restart loop with new parameters
+            }
+            else
+            {
+                _monitor.Stop(host.Id);
+                _overlay.DismissTilesFor(host.Id);
+            }
             SaveSettings();
         }
     }

@@ -51,7 +51,8 @@ public static class SettingsService
         {
             Hosts =
             {
-                new HostEntry { Name = "Google DNS", Address = "8.8.8.8", CheckType = CheckType.Icmp }
+                new HostEntry { Name = "Google DNS", Address = "8.8.8.8", CheckType = CheckType.Icmp },
+                new HostEntry { Name = "Default Gateway", Address = "{gateway}", CheckType = CheckType.Icmp }
             }
         };
     }

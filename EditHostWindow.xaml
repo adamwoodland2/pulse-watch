@@ -41,7 +41,7 @@
                     </ComboBox>
                 </StackPanel>
 
-                <StackPanel Grid.Column="2">
+                <StackPanel Grid.Column="2" x:Name="PortPanel">
                     <TextBlock Text="PORT" Style="{StaticResource FieldLabel}"/>
                     <TextBox x:Name="PortBox" Style="{StaticResource NeonTextBox}"
                              Text="443" FontFamily="Consolas"/>
@@ -51,26 +51,38 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="CHECK INTERVAL (SECONDS)" Style="{StaticResource FieldLabel}"/>
+                    <TextBlock Text="INTERVAL (S)" Style="{StaticResource FieldLabel}"/>
                     <TextBox x:Name="IntervalBox" Style="{StaticResource NeonTextBox}"
-                             Text="30" FontFamily="Consolas" Width="110" HorizontalAlignment="Left"/>
+                             Text="30" FontFamily="Consolas"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
-                    <TextBlock Text="RETRIES BEFORE OFFLINE" Style="{StaticResource FieldLabel}"/>
+                    <TextBlock Text="RETRIES" Style="{StaticResource FieldLabel}"/>
                     <TextBox x:Name="RetryBox" Style="{StaticResource NeonTextBox}"
-                             Text="1" FontFamily="Consolas" Width="110" HorizontalAlignment="Left"/>
+                             Text="1" FontFamily="Consolas"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="4">
+                    <TextBlock Text="TIMEOUT (MS)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="TimeoutBox" Style="{StaticResource NeonTextBox}"
+                             Text="4000" FontFamily="Consolas"/>
                 </StackPanel>
             </Grid>
 
+            <CheckBox x:Name="ActiveCheck" Style="{StaticResource NeonCheck}"
+                      Content="Active — untick to pause checks for this target"
+                      IsChecked="True" Margin="0,14,0,0"/>
+
             <CheckBox x:Name="SoundCheck" Style="{StaticResource NeonCheck}"
                       Content="Play a subtle ping when an alert appears"
-                      IsChecked="True" Margin="0,14,0,0"/>
+                      IsChecked="True" Margin="0,10,0,0"/>
 
             <TextBlock Text="TILE COLOURS (BLANK = USE GLOBAL SETTING)" Style="{StaticResource FieldLabel}"
                        Margin="0,16,0,6"/>
@@ -112,9 +124,10 @@
                        Visibility="Collapsed"/>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
-                <Button Content="CANCEL" Style="{StaticResource DangerButton}" Click="Cancel_Click"/>
-                <Button Content="SAVE" Style="{StaticResource NeonButton}" Margin="10,0,0,0"
+                <Button Content="SAVE" Style="{StaticResource NeonButton}"
                         Click="Save_Click" IsDefault="True"/>
+                <Button Content="CANCEL" Style="{StaticResource DangerButton}" Margin="10,0,0,0"
+                        Click="Cancel_Click" IsCancel="True"/>
             </StackPanel>
         </StackPanel>
     </Border>

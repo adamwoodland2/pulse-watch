@@ -25,6 +25,7 @@ public partial class EditHostWindow : Window
         ValidationHelpers.MakeNumeric(PortBox);
         ValidationHelpers.MakeNumeric(IntervalBox);
         ValidationHelpers.MakeNumeric(RetryBox);
+        ValidationHelpers.MakeNumeric(TimeoutBox);
         RefreshSwatches();
     }
 
@@ -38,6 +39,8 @@ public partial class EditHostWindow : Window
         PortBox.Text = existing.Port.ToString();
         IntervalBox.Text = existing.IntervalSeconds.ToString();
         RetryBox.Text = existing.RetryCount.ToString();
+        TimeoutBox.Text = existing.TimeoutMs.ToString();
+        ActiveCheck.IsChecked = existing.Enabled;
         SoundCheck.IsChecked = existing.PlaySound;
         OfflineColorBox.Text = existing.OfflineColor ?? "";
         OnlineColorBox.Text = existing.OnlineColor ?? "";
@@ -76,8 +79,9 @@ public partial class EditHostWindow : Window
 
     private void TypeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (PortBox != null)
-            PortBox.IsEnabled = TypeCombo.SelectedIndex == 0;
+        if (PortPanel != null)
+            // Hidden (not Collapsed) keeps the space reserved so nothing shifts.
+            PortPanel.Visibility = TypeCombo.SelectedIndex == 0 ? Visibility.Visible : Visibility.Hidden;
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -110,6 +114,12 @@ public partial class EditHostWindow : Window
             return;
         }
 
+        if (!int.TryParse(TimeoutBox.Text, out var timeout) || timeout < 100 || timeout > 60000)
+        {
+            ShowError("Timeout must be between 100 and 60000 milliseconds.");
+            return;
+        }
+
         var offlineColor = OfflineColorBox.Text.Trim();
         var onlineColor = OnlineColorBox.Text.Trim();
         if ((offlineColor.Length > 0 && ValidationHelpers.ParseColor(offlineColor) == null) ||
@@ -128,6 +138,8 @@ public partial class EditHostWindow : Window
             Port = isTcp ? port : 443,
             IntervalSeconds = interval,
             RetryCount = retries,
+            TimeoutMs = timeout,
+            Enabled = ActiveCheck.IsChecked == true,
             PlaySound = SoundCheck.IsChecked == true,
             OfflineColor = offlineColor.Length > 0 ? offlineColor : null,
             OnlineColor = onlineColor.Length > 0 ? onlineColor : null

@@ -90,9 +90,10 @@
                        Text="MIT licence — free to use, modify and redistribute. Settings and targets are stored together in settings.json (Config Folder link on the main screen) for easy backup or moving between machines."/>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
-                <Button Content="CANCEL" Style="{StaticResource DangerButton}" Click="Cancel_Click"/>
-                <Button Content="SAVE" Style="{StaticResource NeonButton}" Margin="10,0,0,0"
+                <Button Content="SAVE" Style="{StaticResource NeonButton}"
                         Click="Save_Click" IsDefault="True"/>
+                <Button Content="CANCEL" Style="{StaticResource DangerButton}" Margin="10,0,0,0"
+                        Click="Cancel_Click" IsCancel="True"/>
             </StackPanel>
         </StackPanel>
     </Border>

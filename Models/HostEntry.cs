@@ -25,7 +25,10 @@ public class HostEntry : INotifyPropertyChanged
     private int _port = 443;
     private int _intervalSeconds = 30;
     private bool _playSound = true;
+    private bool _enabled = true;
     private int _retryCount = 1;
+    private int _timeoutMs = 4000;
+    private string? _lastFailure;
     private HostStatus _status = HostStatus.Unknown;
     private long _latencyMs = -1;
     private DateTime? _lastChecked;
@@ -68,11 +71,33 @@ public class HostEntry : INotifyPropertyChanged
         set { _playSound = value; OnPropertyChanged(); }
     }
 
+    /// <summary>Unticked = target is paused: no checks, no alerts.</summary>
+    public bool Enabled
+    {
+        get => _enabled;
+        set { _enabled = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusDisplay)); }
+    }
+
     /// <summary>Extra attempts after a failed check before declaring offline. 0 = alert on first failure.</summary>
     public int RetryCount
     {
         get => _retryCount;
         set { _retryCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Per-check timeout in milliseconds (ICMP reply / TCP connect).</summary>
+    public int TimeoutMs
+    {
+        get => _timeoutMs;
+        set { _timeoutMs = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Why the last check failed (TIMEOUT, REFUSED, DNS, ...); null when up.</summary>
+    [JsonIgnore]
+    public string? LastFailure
+    {
+        get => _lastFailure;
+        set { _lastFailure = value; OnPropertyChanged(); OnPropertyChanged(nameof(LatencyDisplay)); }
     }
 
     /// <summary>Per-host tile colour override (hex); null = use the global setting.</summary>
@@ -106,7 +131,7 @@ public class HostEntry : INotifyPropertyChanged
     public string ModeDisplay => CheckType == CheckType.Icmp ? "ICMP" : $"TCP:{Port}";
 
     [JsonIgnore]
-    public string StatusDisplay => Status switch
+    public string StatusDisplay => !Enabled ? "PAUSED" : Status switch
     {
         HostStatus.Online => "ONLINE",
         HostStatus.Offline => "OFFLINE",
@@ -114,7 +139,10 @@ public class HostEntry : INotifyPropertyChanged
     };
 
     [JsonIgnore]
-    public string LatencyDisplay => Status == HostStatus.Online && LatencyMs >= 0 ? $"{LatencyMs} ms" : "—";
+    public string LatencyDisplay =>
+        Status == HostStatus.Online && LatencyMs >= 0 ? $"{LatencyMs} ms"
+        : Status == HostStatus.Offline && LastFailure != null ? LastFailure
+        : "—";
 
     [JsonIgnore]
     public string LastCheckedDisplay => LastChecked?.ToString("HH:mm:ss") ?? "—";
