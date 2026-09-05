@@ -1,0 +1,99 @@
+<Window x:Class="ConnectionChecker.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings"
+        Width="440" SizeToContent="Height"
+        Background="{StaticResource BgBrush}"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+
+    <Border Padding="24">
+        <StackPanel>
+            <TextBlock Text="SETTINGS"
+                       Foreground="{StaticResource AccentBrush}"
+                       FontFamily="Consolas" FontSize="16" FontWeight="Bold"
+                       Margin="0,0,0,18"/>
+
+            <!-- Behaviour -->
+            <TextBlock Text="BEHAVIOUR" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+            <CheckBox x:Name="CloseToTrayCheck" Style="{StaticResource NeonCheck}"
+                      Content="Clicking X minimises to the tray instead of exiting"/>
+            <CheckBox x:Name="ConfirmExitCheck" Style="{StaticResource NeonCheck}"
+                      Content="Ask for confirmation before exiting" Margin="0,10,0,0"/>
+            <CheckBox x:Name="AutoStartCheck" Style="{StaticResource NeonCheck}"
+                      Content="Start automatically when I log in (minimised to tray)" Margin="0,10,0,0"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                <TextBlock Text="Alert timeout (seconds)" Foreground="{StaticResource TextBrush}"
+                           FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="DurationBox" Style="{StaticResource NeonTextBox}"
+                         Width="60" Margin="10,0,0,0" TextAlignment="Center" FontFamily="Consolas"/>
+            </StackPanel>
+
+            <!-- Tile colours -->
+            <Border Background="{StaticResource BorderBrush}" Height="1" Margin="0,18,0,14"/>
+            <TextBlock Text="TILE COLOURS" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Offline" Foreground="{StaticResource TextBrush}"
+                           FontSize="12" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="0" Grid.Column="1" x:Name="OfflineColorBox"
+                         Style="{StaticResource NeonTextBox}" FontFamily="Consolas"
+                         TextChanged="ColorBox_TextChanged"/>
+                <Border Grid.Row="0" Grid.Column="2" x:Name="OfflineSwatch"
+                        Width="26" Height="26" CornerRadius="3" Margin="8,0,0,0"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        Cursor="Hand" ToolTip="Click to pick a colour"
+                        MouseLeftButtonUp="OfflineSwatch_Click"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Online" Foreground="{StaticResource TextBrush}"
+                           FontSize="12" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="OnlineColorBox"
+                         Style="{StaticResource NeonTextBox}" FontFamily="Consolas" Margin="0,10,0,0"
+                         TextChanged="ColorBox_TextChanged"/>
+                <Border Grid.Row="1" Grid.Column="2" x:Name="OnlineSwatch"
+                        Width="26" Height="26" CornerRadius="3" Margin="8,10,0,0"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        Cursor="Hand" ToolTip="Click to pick a colour"
+                        MouseLeftButtonUp="OnlineSwatch_Click"/>
+
+                <Button Grid.Row="1" Grid.Column="3" Content="RESET" Style="{StaticResource NeonButton}"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        Padding="10,5" Click="ResetColors_Click"/>
+            </Grid>
+            <TextBlock Text="Click a swatch to pick a colour, or type hex — applies to new tiles."
+                       Foreground="{StaticResource TextDimBrush}" FontSize="11" Margin="0,6,0,0"/>
+
+            <!-- About -->
+            <Border Background="{StaticResource BorderBrush}" Height="1" Margin="0,18,0,14"/>
+            <TextBlock Text="ABOUT" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+            <TextBlock x:Name="VersionText" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+            <TextBlock FontSize="12" Margin="0,4,0,0">
+                <Hyperlink Foreground="{StaticResource AccentBrush}" Click="GitHub_Click">
+                    <Run Text="github.com/adamwoodland2/pulse-watch"/>
+                </Hyperlink>
+            </TextBlock>
+            <TextBlock Foreground="{StaticResource TextDimBrush}" FontSize="11" Margin="0,6,0,0"
+                       TextWrapping="Wrap"
+                       Text="MIT licence — free to use, modify and redistribute. Settings and targets are stored together in settings.json (Config Folder link on the main screen) for easy backup or moving between machines."/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                <Button Content="CANCEL" Style="{StaticResource DangerButton}" Click="Cancel_Click"/>
+                <Button Content="SAVE" Style="{StaticResource NeonButton}" Margin="10,0,0,0"
+                        Click="Save_Click" IsDefault="True"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

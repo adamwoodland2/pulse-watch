@@ -1,0 +1,20 @@
+<Window x:Class="ConnectionChecker.AlertOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PulseWatch Alerts"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Focusable="False"
+        ResizeMode="NoResize"
+        FontFamily="Segoe UI">
+
+    <!-- Transparent pixels are click-through; only the tiles themselves take clicks. -->
+    <ScrollViewer VerticalScrollBarVisibility="Hidden" Focusable="False">
+        <StackPanel x:Name="AlertHost" Width="340" Margin="0,16,16,16"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"/>
+    </ScrollViewer>
+</Window>
