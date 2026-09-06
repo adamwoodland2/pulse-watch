@@ -16,8 +16,9 @@ public static class AppIcon
     /// <summary>32x32 for title bar and taskbar.</summary>
     public static readonly ImageSource WindowIcon = CreateImageSource(32);
 
-    /// <summary>16x16 GDI icon for the notification-area tray icon.</summary>
-    public static Drawing.Icon CreateTrayIcon() => CreateGdiIcon(16);
+    /// <summary>16x16 GDI icon for the notification-area tray icon; red ring when alerting.</summary>
+    public static Drawing.Icon CreateTrayIcon(bool alert = false)
+        => CreateGdiIcon(16, alert ? Drawing.Color.FromArgb(255, 59, 92) : null);
 
     private static ImageSource CreateImageSource(int size)
     {
@@ -31,7 +32,7 @@ public static class AppIcon
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
 
-    private static Drawing.Icon CreateGdiIcon(int size)
+    private static Drawing.Icon CreateGdiIcon(int size, Drawing.Color? ringColor = null)
     {
         using var bmp = new Drawing.Bitmap(size, size);
         using (var g = Drawing.Graphics.FromImage(bmp))
@@ -40,7 +41,7 @@ public static class AppIcon
             g.Clear(Drawing.Color.FromArgb(10, 14, 23));
             float pen = size / 8f;
             float inset = pen * 1.5f;
-            using var ring = new Drawing.Pen(Drawing.Color.FromArgb(0, 229, 255), pen);
+            using var ring = new Drawing.Pen(ringColor ?? Drawing.Color.FromArgb(0, 229, 255), pen);
             g.DrawEllipse(ring, inset, inset, size - 2 * inset, size - 2 * inset);
         }
 

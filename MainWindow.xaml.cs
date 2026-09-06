@@ -146,6 +146,24 @@ public partial class MainWindow : Window
         Activate();
     }
 
+    private bool _trayShowsAlert;
+
+    /// <summary>Red ring while any active target is offline, cyan otherwise.</summary>
+    private void UpdateTrayIcon()
+    {
+        var offline = _hosts.Count(h => h.Enabled && h.Status == HostStatus.Offline);
+        var alert = offline > 0;
+        _trayIcon.Text = alert
+            ? $"PULSE//WATCH — {offline} target{(offline == 1 ? "" : "s")} offline"
+            : "PULSE//WATCH — connection monitor";
+        if (alert == _trayShowsAlert) return;
+
+        _trayShowsAlert = alert;
+        var old = _trayIcon.Icon;
+        _trayIcon.Icon = AppIcon.CreateTrayIcon(alert);
+        old?.Dispose();
+    }
+
     private void HideToTray()
     {
         Hide(); // to tray; the overlay keeps showing alerts
@@ -179,6 +197,7 @@ public partial class MainWindow : Window
 
     private void SaveSettings()
     {
+        UpdateTrayIcon(); // list or status just changed (remove/pause/edit clear alerts)
         _settings.Hosts = _hosts.ToList();
         if (!SettingsService.Save(_settings))
         {
@@ -346,6 +365,8 @@ public partial class MainWindow : Window
             // Drop events from loops that were stopped/replaced (host removed,
             // edited, or paused) between publication and this marshal.
             if (!_monitor.IsCurrent(e.Host.Id, e.Token)) return;
+
+            UpdateTrayIcon();
 
             if (e.NewStatus == HostStatus.Offline)
             {
