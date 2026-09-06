@@ -28,15 +28,25 @@ public partial class MainWindow : Window
 
         Icon = AppIcon.WindowIcon;
 
-        _settings = SettingsService.Load();
+        _settings = SettingsService.Load(out var loadWarning);
         ApplyTileColors();
         _overlay.Muted = _settings.MuteSounds;
+
+        // Subscribe before any loop starts so a fast first check can't
+        // publish its initial offline transition into the void.
+        _monitor.StatusChanged += OnStatusChanged;
 
         foreach (var host in _settings.Hosts)
         {
             _hosts.Add(host);
             if (host.Enabled)
                 _monitor.Start(host);
+        }
+
+        if (loadWarning != null)
+        {
+            Loaded += (_, _) => System.Windows.MessageBox.Show(this, loadWarning,
+                "PULSE//WATCH", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         HostList.ItemsSource = _hosts;
@@ -48,8 +58,6 @@ public partial class MainWindow : Window
         };
         _hosts.CollectionChanged += (_, _) => UpdateEmptyState();
         UpdateEmptyState();
-
-        _monitor.StatusChanged += OnStatusChanged;
 
         _trayIcon = CreateTrayIcon();
         StateChanged += (_, _) =>
@@ -172,7 +180,12 @@ public partial class MainWindow : Window
     private void SaveSettings()
     {
         _settings.Hosts = _hosts.ToList();
-        SettingsService.Save(_settings);
+        if (!SettingsService.Save(_settings))
+        {
+            _trayIcon?.ShowBalloonTip(3000, "PULSE//WATCH",
+                "Settings could not be saved — recent changes may be lost on exit.",
+                WinForms.ToolTipIcon.Warning);
+        }
     }
 
     // ===== CRUD =====
@@ -279,6 +292,7 @@ public partial class MainWindow : Window
         var dialog = new EditHostWindow(_settings, host) { Owner = this };
         if (dialog.ShowDialog() == true && dialog.Result != null)
         {
+            _monitor.Stop(host.Id); // stop the old loop before mutating shared state
             host.Name = dialog.Result.Name;
             host.Address = dialog.Result.Address;
             host.CheckType = dialog.Result.CheckType;
@@ -295,11 +309,10 @@ public partial class MainWindow : Window
             host.LastFailure = null;
             if (host.Enabled)
             {
-                _monitor.Start(host); // restart loop with new parameters
+                _monitor.Start(host); // fresh loop with new parameters
             }
             else
             {
-                _monitor.Stop(host.Id);
                 _overlay.DismissTilesFor(host.Id);
             }
             SaveSettings();
@@ -329,6 +342,10 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             if (_exiting) return;
+
+            // Drop events from loops that were stopped/replaced (host removed,
+            // edited, or paused) between publication and this marshal.
+            if (!_monitor.IsCurrent(e.Host.Id, e.Token)) return;
 
             if (e.NewStatus == HostStatus.Offline)
             {

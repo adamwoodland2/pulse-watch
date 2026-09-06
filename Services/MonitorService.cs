@@ -11,6 +11,9 @@ public class StatusChangedEventArgs : EventArgs
     public required HostEntry Host { get; init; }
     public required HostStatus OldStatus { get; init; }
     public required HostStatus NewStatus { get; init; }
+
+    /// <summary>Identifies the loop that raised this; lets subscribers drop stale events via IsCurrent.</summary>
+    public required CancellationToken Token { get; init; }
 }
 
 /// <summary>
@@ -19,35 +22,48 @@ public class StatusChangedEventArgs : EventArgs
 /// </summary>
 public class MonitorService : IDisposable
 {
+    private readonly object _gate = new();
     private readonly Dictionary<Guid, CancellationTokenSource> _loops = new();
 
     public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     public void Start(HostEntry host)
     {
-        Stop(host.Id);
-        var cts = new CancellationTokenSource();
-        _loops[host.Id] = cts;
-        _ = RunLoopAsync(host, cts.Token);
+        lock (_gate)
+        {
+            Stop(host.Id);
+            var cts = new CancellationTokenSource();
+            _loops[host.Id] = cts;
+            _ = RunLoopAsync(host, cts.Token);
+        }
     }
 
+    // Note: Cancel only, no Dispose — the loop still holds the token and may
+    // touch it (linked CTS, Task.Delay) after cancellation.
     public void Stop(Guid hostId)
     {
-        if (_loops.Remove(hostId, out var cts))
+        lock (_gate)
         {
-            cts.Cancel();
-            cts.Dispose();
+            if (_loops.Remove(hostId, out var cts))
+                cts.Cancel();
         }
     }
 
     public void StopAll()
     {
-        foreach (var cts in _loops.Values)
+        lock (_gate)
         {
-            cts.Cancel();
-            cts.Dispose();
+            foreach (var cts in _loops.Values)
+                cts.Cancel();
+            _loops.Clear();
         }
-        _loops.Clear();
+    }
+
+    /// <summary>True while the given token belongs to the host's currently registered loop.</summary>
+    public bool IsCurrent(Guid hostId, CancellationToken token)
+    {
+        lock (_gate)
+            return _loops.TryGetValue(hostId, out var cts) && cts.Token == token;
     }
 
     private async Task RunLoopAsync(HostEntry host, CancellationToken token)
@@ -70,7 +86,9 @@ public class MonitorService : IDisposable
                 }
                 (isUp, latency, failure) = await CheckAsync(host, token);
             }
-            if (token.IsCancellationRequested) return;
+            // Publish only while this loop is still the registered one, so a
+            // stopped/edited/removed host isn't mutated or alerted afterwards.
+            if (!IsCurrent(host.Id, token)) return;
 
             var oldStatus = host.Status;
             var newStatus = isUp ? HostStatus.Online : HostStatus.Offline;
@@ -86,7 +104,8 @@ public class MonitorService : IDisposable
                 {
                     Host = host,
                     OldStatus = oldStatus,
-                    NewStatus = newStatus
+                    NewStatus = newStatus,
+                    Token = token
                 });
             }
 
@@ -163,18 +182,20 @@ public class MonitorService : IDisposable
     // interleaved, 300 ms stagger) and take the first that connects.
     private static async Task<(bool, long, string?)> TcpAsync(string address, int port, int timeoutMs, CancellationToken token)
     {
+        // The timeout budget covers DNS resolution too, so a slow resolver
+        // can't stretch a check past the configured per-host timeout.
+        using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        raceCts.CancelAfter(timeoutMs);
+
         var addresses = System.Net.IPAddress.TryParse(address, out var literal)
             ? new[] { literal }
-            : await Dns.GetHostAddressesAsync(address, token);
+            : await Dns.GetHostAddressesAsync(address, raceCts.Token);
 
         var candidates = Interleave(
                 addresses.Where(a => a.AddressFamily == AddressFamily.InterNetworkV6),
                 addresses.Where(a => a.AddressFamily == AddressFamily.InterNetwork))
             .Take(4).ToArray();
         if (candidates.Length == 0) return (false, -1, "DNS");
-
-        using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-        raceCts.CancelAfter(timeoutMs);
 
         var attempts = candidates
             .Select((addr, i) => AttemptConnectAsync(addr, port, i * 300, raceCts.Token))

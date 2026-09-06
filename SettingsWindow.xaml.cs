@@ -87,8 +87,13 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        // When enabling, always rewrite the entry: repairs a stale path if the
+        // exe has moved since auto-start was first ticked.
         var wantAutoStart = AutoStartCheck.IsChecked == true;
-        if (wantAutoStart != StartupService.IsEnabled() && !StartupService.SetEnabled(wantAutoStart))
+        var autoStartOk = wantAutoStart
+            ? StartupService.SetEnabled(true)
+            : !StartupService.IsEnabled() || StartupService.SetEnabled(false);
+        if (!autoStartOk)
         {
             System.Windows.MessageBox.Show(this,
                 "Couldn't update the auto-start entry in the registry. Other settings were still saved.",

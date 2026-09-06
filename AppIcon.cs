@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -27,6 +28,9 @@ public static class AppIcon
         return source;
     }
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+
     private static Drawing.Icon CreateGdiIcon(int size)
     {
         using var bmp = new Drawing.Bitmap(size, size);
@@ -39,6 +43,18 @@ public static class AppIcon
             using var ring = new Drawing.Pen(Drawing.Color.FromArgb(0, 229, 255), pen);
             g.DrawEllipse(ring, inset, inset, size - 2 * inset, size - 2 * inset);
         }
-        return Drawing.Icon.FromHandle(bmp.GetHicon());
+
+        // GetHicon hands us an HICON that Icon.FromHandle does NOT own; clone
+        // to an owned Icon, then release the native handle ourselves.
+        var hIcon = bmp.GetHicon();
+        try
+        {
+            using var unowned = Drawing.Icon.FromHandle(hIcon);
+            return (Drawing.Icon)unowned.Clone();
+        }
+        finally
+        {
+            DestroyIcon(hIcon);
+        }
     }
 }

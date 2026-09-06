@@ -59,6 +59,7 @@ public partial class AlertOverlayWindow : Window
             var handle = new WindowInteropHelper(this).Handle;
             SetWindowLong(handle, GWL_EXSTYLE,
                 GetWindowLong(handle, GWL_EXSTYLE) | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
+            PositionOnScreen(); // re-run with the window's real device transform available
         };
     }
 
@@ -70,9 +71,12 @@ public partial class AlertOverlayWindow : Window
         var screens = System.Windows.Forms.Screen.AllScreens;
         if (App.MonitorOverride is int n && n >= 1 && n <= screens.Length)
         {
-            // Screen gives device pixels; WPF wants DIPs (system-DPI aware).
+            // Screen gives device pixels; WPF wants DIPs. Prefer this window's
+            // actual device transform (correct sign/scale for monitors left of
+            // or above the primary); fall back to desktop DPI pre-Show.
             var wa = screens[n - 1].WorkingArea;
-            double scale = GetDipScale();
+            double scale = PresentationSource.FromVisual(this)?.CompositionTarget
+                ?.TransformFromDevice.M11 ?? GetDipScale();
             Height = wa.Height * scale;
             Left = (wa.Right * scale) - Width;
             Top = wa.Top * scale;
