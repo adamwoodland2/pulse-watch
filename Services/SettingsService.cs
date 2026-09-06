@@ -13,6 +13,7 @@ public class AppSettings
     public int AlertDurationSeconds { get; set; } = 10;
     public bool CloseToTray { get; set; } = false;
     public bool ConfirmOnExit { get; set; } = true;
+    public bool MuteSounds { get; set; }
     public string OfflineTileColor { get; set; } = DefaultOfflineColor;
     public string OnlineTileColor { get; set; } = DefaultOnlineColor;
     public List<HostEntry> Hosts { get; set; } = new();

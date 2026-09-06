@@ -126,7 +126,11 @@
                      BorderThickness="0"
                      ItemContainerStyle="{StaticResource HostRow}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                     MouseDoubleClick="HostList_MouseDoubleClick">
+                     MouseDoubleClick="HostList_MouseDoubleClick"
+                     AllowDrop="True"
+                     PreviewMouseLeftButtonDown="HostList_PreviewMouseLeftButtonDown"
+                     PreviewMouseMove="HostList_PreviewMouseMove"
+                     Drop="HostList_Drop">
                 <ListBox.ItemTemplate>
                     <DataTemplate DataType="{x:Type models:HostEntry}">
                         <Grid>

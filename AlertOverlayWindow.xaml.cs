@@ -41,6 +41,9 @@ public partial class AlertOverlayWindow : Window
     public Color OfflineColor { get; set; } = Color.FromRgb(0xFF, 0x3B, 0x5C);
     public Color OnlineColor { get; set; } = Color.FromRgb(0x22, 0xE5, 0x84);
 
+    /// <summary>Global mute (tray toggle): tiles still show, pings don't play.</summary>
+    public bool Muted { get; set; }
+
     public AlertOverlayWindow()
     {
         InitializeComponent();
@@ -90,7 +93,7 @@ public partial class AlertOverlayWindow : Window
 
     public void ShowAlert(HostEntry host, bool isOnline, int durationSeconds)
     {
-        if (host.PlaySound)
+        if (host.PlaySound && !Muted)
         {
             if (isOnline) SoundService.PlayUp();
             else SoundService.PlayDown();

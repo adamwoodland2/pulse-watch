@@ -4,6 +4,11 @@ using System.Collections.ObjectModel;
 using ConnectionChecker.Models;
 using ConnectionChecker.Services;
 using WinForms = System.Windows.Forms;
+using Point = System.Windows.Point;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using DragEventArgs = System.Windows.DragEventArgs;
+using DragDrop = System.Windows.DragDrop;
+using DragDropEffects = System.Windows.DragDropEffects;
 
 namespace ConnectionChecker;
 
@@ -25,6 +30,7 @@ public partial class MainWindow : Window
 
         _settings = SettingsService.Load();
         ApplyTileColors();
+        _overlay.Muted = _settings.MuteSounds;
 
         foreach (var host in _settings.Hosts)
         {
@@ -97,6 +103,20 @@ public partial class MainWindow : Window
     {
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add("Open", null, (_, _) => RestoreFromTray());
+
+        var mute = new WinForms.ToolStripMenuItem("Mute alert sounds")
+        {
+            CheckOnClick = true,
+            Checked = _settings.MuteSounds
+        };
+        mute.CheckedChanged += (_, _) =>
+        {
+            _settings.MuteSounds = mute.Checked;
+            _overlay.Muted = mute.Checked;
+            SaveSettings();
+        };
+        menu.Items.Add(mute);
+
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => { _exitRequested = true; Close(); });
 
@@ -171,20 +191,24 @@ public partial class MainWindow : Window
 
     private void Edit_Click(object sender, RoutedEventArgs e) => EditSelected();
 
-    // Double-click a row = edit that row; double-click empty space = add.
-    // (Selection alone can't tell these apart — a selected row stays selected
-    // when you click the background.)
-    private void HostList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private static System.Windows.Controls.ListBoxItem? FindListBoxItem(object? source)
     {
-        var element = e.OriginalSource as DependencyObject;
+        var element = source as DependencyObject;
         while (element != null && element is not System.Windows.Controls.ListBoxItem)
         {
             element = element is System.Windows.Media.Visual
                 ? System.Windows.Media.VisualTreeHelper.GetParent(element)
                 : LogicalTreeHelper.GetParent(element);
         }
+        return element as System.Windows.Controls.ListBoxItem;
+    }
 
-        if (element is System.Windows.Controls.ListBoxItem { DataContext: HostEntry host })
+    // Double-click a row = edit that row; double-click empty space = add.
+    // (Selection alone can't tell these apart — a selected row stays selected
+    // when you click the background.)
+    private void HostList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (FindListBoxItem(e.OriginalSource) is { DataContext: HostEntry host })
         {
             HostList.SelectedItem = host;
             EditSelected();
@@ -192,6 +216,59 @@ public partial class MainWindow : Window
         else
         {
             Add_Click(sender, e);
+        }
+    }
+
+    // ===== Drag-to-reorder =====
+
+    private Point _dragStart;
+    private HostEntry? _dragCandidate;
+
+    private void HostList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStart = e.GetPosition(null);
+        _dragCandidate = FindListBoxItem(e.OriginalSource)?.DataContext as HostEntry;
+    }
+
+    private void HostList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragCandidate == null || e.LeftButton != MouseButtonState.Pressed) return;
+
+        // Don't hijack plain clicks/double-clicks: require a real drag distance.
+        var pos = e.GetPosition(null);
+        if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+
+        var dragged = _dragCandidate;
+        _dragCandidate = null;
+        DragDrop.DoDragDrop(HostList, dragged, DragDropEffects.Move);
+    }
+
+    private void HostList_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(HostEntry)) is not HostEntry dragged) return;
+        var oldIndex = _hosts.IndexOf(dragged);
+        if (oldIndex < 0) return;
+
+        int insertAt;
+        var targetItem = FindListBoxItem(e.OriginalSource);
+        if (targetItem?.DataContext is HostEntry target && !ReferenceEquals(target, dragged))
+        {
+            // Above the row's midpoint = before it, below = after it.
+            insertAt = _hosts.IndexOf(target);
+            if (e.GetPosition(targetItem).Y > targetItem.ActualHeight / 2) insertAt++;
+            if (insertAt > oldIndex) insertAt--; // account for removal of the dragged row
+        }
+        else
+        {
+            insertAt = _hosts.Count - 1; // dropped on empty space: move to end
+        }
+
+        if (insertAt != oldIndex)
+        {
+            _hosts.Move(oldIndex, insertAt);
+            SaveSettings();
         }
     }
 
