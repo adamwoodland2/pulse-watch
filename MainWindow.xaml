@@ -52,7 +52,7 @@
 
         <Style x:Key="HostRow" TargetType="ListBoxItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -62,7 +62,7 @@
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="5"
-                                Padding="16,12">
+                                Padding="16,6">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -172,13 +172,11 @@
                                 </TextBlock.Style>
                             </TextBlock>
 
-                            <StackPanel Grid.Column="5" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding LastCheckedDisplay}" Foreground="{StaticResource TextDimBrush}"
-                                           FontFamily="Consolas" FontSize="11"/>
-                                <TextBlock Foreground="{StaticResource TextDimBrush}" FontSize="10">
-                                    <Run Text="every "/><Run Text="{Binding IntervalSeconds}"/><Run Text="s"/>
-                                </TextBlock>
-                            </StackPanel>
+                            <TextBlock Grid.Column="5" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextDimBrush}"
+                                       FontFamily="Consolas" FontSize="11">
+                                <Run Text="{Binding LastCheckedDisplay, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding IntervalSeconds}"/><Run Text="s"/>
+                            </TextBlock>
 
                             <TextBlock Grid.Column="6" Text="{Binding StatusDisplay}" Style="{StaticResource StatusText}"
                                        VerticalAlignment="Center" HorizontalAlignment="Right"/>
