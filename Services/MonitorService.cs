@@ -68,6 +68,21 @@ public class MonitorService : IDisposable
 
     private async Task RunLoopAsync(HostEntry host, CancellationToken token)
     {
+        try
+        {
+            await RunLoopCoreAsync(host, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown: Stop() can cancel mid-check (CheckAsync only
+            // swallows cancellation while the loop token is alive), and a
+            // closing dispatcher cancels StatusChanged marshalling. Without
+            // this, the fire-and-forget loop task faults unobserved.
+        }
+    }
+
+    private async Task RunLoopCoreAsync(HostEntry host, CancellationToken token)
+    {
         while (!token.IsCancellationRequested)
         {
             var (isUp, latency, failure) = await CheckAsync(host, token);
