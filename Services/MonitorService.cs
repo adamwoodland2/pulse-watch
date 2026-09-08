@@ -231,9 +231,15 @@ public class MonitorService : IDisposable
     private static async Task<long> AttemptConnectAsync(System.Net.IPAddress addr, int port, int delayMs, CancellationToken token)
     {
         if (delayMs > 0) await Task.Delay(delayMs, token);
-        using var client = new TcpClient(addr.AddressFamily);
+        // Abortive close (RST) instead of FIN: probe sockets exchange no data,
+        // and a graceful close would leave one TIME_WAIT/FIN_WAIT entry per
+        // check per raced address until the OS times them out. Raw Socket, not
+        // TcpClient: TcpClient.Dispose calls Shutdown first, which sends a FIN
+        // and defeats the linger-0 abort.
+        using var socket = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        socket.LingerState = new LingerOption(enable: true, seconds: 0);
         var sw = Stopwatch.StartNew();
-        await client.ConnectAsync(addr, port, token);
+        await socket.ConnectAsync(addr, port, token);
         return sw.ElapsedMilliseconds;
     }
 
