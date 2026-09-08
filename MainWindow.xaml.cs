@@ -124,6 +124,7 @@ public partial class MainWindow : Window
             SaveSettings();
         };
         menu.Items.Add(mute);
+        menu.Items.Add(BuildSuppressMenu());
 
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => { _exitRequested = true; Close(); });
@@ -146,6 +147,70 @@ public partial class MainWindow : Window
         Activate();
     }
 
+    // ===== Tile suppression (session-only) =====
+
+    private DateTime? _suppressUntil; // null = off, MaxValue = until re-enabled
+    private WinForms.ToolStripMenuItem? _suppressMenu;
+    private WinForms.ToolStripMenuItem? _suppressOffItem;
+
+    private bool TilesSuppressed => _suppressUntil is { } until && DateTime.Now < until;
+
+    private WinForms.ToolStripMenuItem BuildSuppressMenu()
+    {
+        _suppressMenu = new WinForms.ToolStripMenuItem("Suppress tiles");
+        _suppressOffItem = AddSuppressOption("Off — show tiles", null);
+        _suppressOffItem.Checked = true;
+        AddSuppressOption("Until re-enabled", TimeSpan.MaxValue);
+        foreach (var (label, minutes) in new[]
+                 { ("For 1 minute", 1), ("For 5 minutes", 5), ("For 15 minutes", 15),
+                   ("For 30 minutes", 30), ("For 1 hour", 60), ("For 12 hours", 720) })
+            AddSuppressOption(label, TimeSpan.FromMinutes(minutes));
+
+        // A timed suppression may have lapsed since the menu was last open —
+        // snap the checkmark and title back to reality before showing it.
+        _suppressMenu.DropDownOpening += (_, _) =>
+        {
+            if (!TilesSuppressed && _suppressUntil != null)
+            {
+                _suppressUntil = null;
+                CheckOnlySuppressItem(_suppressOffItem!);
+            }
+            RefreshSuppressTitle();
+        };
+        return _suppressMenu;
+    }
+
+    private WinForms.ToolStripMenuItem AddSuppressOption(string label, TimeSpan? duration)
+    {
+        var item = new WinForms.ToolStripMenuItem(label);
+        item.Click += (_, _) =>
+        {
+            _suppressUntil = duration == null ? null
+                : duration == TimeSpan.MaxValue ? DateTime.MaxValue
+                : DateTime.Now + duration.Value;
+            CheckOnlySuppressItem(item);
+            RefreshSuppressTitle();
+        };
+        _suppressMenu!.DropDownItems.Add(item);
+        return item;
+    }
+
+    private void CheckOnlySuppressItem(WinForms.ToolStripMenuItem selected)
+    {
+        foreach (WinForms.ToolStripMenuItem item in _suppressMenu!.DropDownItems)
+            item.Checked = ReferenceEquals(item, selected);
+    }
+
+    private void RefreshSuppressTitle()
+    {
+        _suppressMenu!.Text = _suppressUntil switch
+        {
+            null => "Suppress tiles",
+            { } u when u == DateTime.MaxValue => "Suppress tiles (until re-enabled)",
+            { } u => $"Suppress tiles (until {u:HH:mm})"
+        };
+    }
+
     private bool _trayShowsAlert;
 
     /// <summary>Red ring while any active target is offline, cyan otherwise.</summary>
@@ -164,13 +229,7 @@ public partial class MainWindow : Window
         old?.Dispose();
     }
 
-    private void HideToTray()
-    {
-        Hide(); // to tray; the overlay keeps showing alerts
-        _trayIcon.ShowBalloonTip(2000, "PULSE//WATCH",
-            "Still monitoring — alerts pop on the right edge of the screen.",
-            WinForms.ToolTipIcon.Info);
-    }
+    private void HideToTray() => Hide(); // to tray; the overlay keeps showing alerts
 
     private void ApplyTileColors()
     {
@@ -370,12 +429,14 @@ public partial class MainWindow : Window
 
             if (e.NewStatus == HostStatus.Offline)
             {
-                _overlay.ShowAlert(e.Host, isOnline: false, _settings.AlertDurationSeconds);
+                if (!TilesSuppressed)
+                    _overlay.ShowAlert(e.Host, isOnline: false, _settings.AlertDurationSeconds);
             }
             else if (e.NewStatus == HostStatus.Online && e.OldStatus == HostStatus.Offline)
             {
-                _overlay.DismissTilesFor(e.Host.Id);
-                _overlay.ShowAlert(e.Host, isOnline: true, _settings.AlertDurationSeconds);
+                _overlay.DismissTilesFor(e.Host.Id); // clear stale red tiles even while suppressed
+                if (!TilesSuppressed)
+                    _overlay.ShowAlert(e.Host, isOnline: true, _settings.AlertDurationSeconds);
             }
         });
     }

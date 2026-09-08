@@ -16,6 +16,10 @@
                        FontFamily="Consolas" FontSize="16" FontWeight="Bold"
                        Margin="0,0,0,18"/>
 
+            <CheckBox x:Name="ActiveCheck" Style="{StaticResource NeonCheck}"
+                      Content="Active — untick to pause checks for this target"
+                      IsChecked="True" Margin="0,0,0,16"/>
+
             <TextBlock Text="DISPLAY NAME" Style="{StaticResource FieldLabel}"/>
             <TextBox x:Name="NameBox" Style="{StaticResource NeonTextBox}" Margin="0,0,0,14"/>
 
@@ -76,13 +80,9 @@
                 </StackPanel>
             </Grid>
 
-            <CheckBox x:Name="ActiveCheck" Style="{StaticResource NeonCheck}"
-                      Content="Active — untick to pause checks for this target"
-                      IsChecked="True" Margin="0,14,0,0"/>
-
             <CheckBox x:Name="SoundCheck" Style="{StaticResource NeonCheck}"
                       Content="Play a subtle ping when an alert appears"
-                      IsChecked="True" Margin="0,10,0,0"/>
+                      IsChecked="True" Margin="0,14,0,0"/>
 
             <TextBlock Text="TILE COLOURS (BLANK = USE GLOBAL SETTING)" Style="{StaticResource FieldLabel}"
                        Margin="0,16,0,6"/>

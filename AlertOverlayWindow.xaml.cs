@@ -34,6 +34,13 @@ public partial class AlertOverlayWindow : Window
     [DllImport("user32.dll")]
     private static extern int SetWindowLong(IntPtr hWnd, int index, int newStyle);
 
+    private static readonly IntPtr HWND_TOPMOST = new(-1);
+    private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int x, int y, int cx, int cy, uint flags);
+
     // Live offline tiles per host, so a recovery can dismiss them early.
     private readonly Dictionary<Guid, List<Border>> _offlineTiles = new();
 
@@ -97,6 +104,12 @@ public partial class AlertOverlayWindow : Window
 
     public void ShowAlert(HostEntry host, bool isOnline, int durationSeconds)
     {
+        // Topmost can be silently lost (another topmost window asserting itself,
+        // Explorer restart, resume from sleep) — re-assert it for every tile.
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero)
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
         if (host.PlaySound && !Muted)
         {
             if (isOnline) SoundService.PlayUp();
