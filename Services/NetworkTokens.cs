@@ -1,5 +1,7 @@
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using ConnectionChecker.Models;
 
 namespace ConnectionChecker.Services;
 
@@ -14,26 +16,40 @@ public static class NetworkTokens
     public static bool IsToken(string address)
         => All.Contains(address.ToLowerInvariant());
 
-    /// <summary>Returns the concrete address to check, or null if a token can't resolve right now.</summary>
-    public static string? Resolve(string address) => address.ToLowerInvariant() switch
+    /// <summary>
+    /// Returns the concrete address to check, or null if a token has no address
+    /// of the requested family right now. Auto prefers IPv4, falls back to IPv6.
+    /// </summary>
+    public static string? Resolve(string address, IpVersion version) => address.ToLowerInvariant() switch
     {
-        "{gateway}" => FirstIPv4(p => p.GatewayAddresses.Select(g => g.Address)),
-        "{dns}" => FirstIPv4(p => p.DnsAddresses),
+        "{gateway}" => Pick(p => p.GatewayAddresses.Select(g => g.Address), version),
+        "{dns}" => Pick(p => p.DnsAddresses, version),
         _ => address
     };
 
-    private static string? FirstIPv4(Func<IPInterfaceProperties, IEnumerable<System.Net.IPAddress>> selector)
+    private static string? Pick(Func<IPInterfaceProperties, IEnumerable<IPAddress>> selector, IpVersion version)
     {
         try
         {
-            return NetworkInterface.GetAllNetworkInterfaces()
+            var all = NetworkInterface.GetAllNetworkInterfaces()
                 .Where(n => n.OperationalStatus == OperationalStatus.Up &&
                             n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                 .SelectMany(n => selector(n.GetIPProperties()))
-                .Where(a => a.AddressFamily == AddressFamily.InterNetwork &&
-                            !System.Net.IPAddress.Any.Equals(a))
-                .Select(a => a.ToString())
-                .FirstOrDefault();
+                .Where(a => !IPAddress.Any.Equals(a) && !IPAddress.IPv6Any.Equals(a))
+                .ToList();
+
+            var v4 = all.Where(a => a.AddressFamily == AddressFamily.InterNetwork);
+            var v6 = all.Where(a => a.AddressFamily == AddressFamily.InterNetworkV6);
+
+            // IPv6 gateways are usually link-local (fe80::…%scope); ToString()
+            // keeps the scope id, which Ping/Socket need to pick the interface.
+            var chosen = version switch
+            {
+                IpVersion.IPv4 => v4.FirstOrDefault(),
+                IpVersion.IPv6 => v6.FirstOrDefault(),
+                _ => v4.FirstOrDefault() ?? v6.FirstOrDefault()
+            };
+            return chosen?.ToString();
         }
         catch
         {

@@ -1,14 +1,17 @@
 <#
 .SYNOPSIS
-    Builds PULSE//WATCH and publishes a single-file exe to .\dist.
+    Builds PULSE//WATCH and publishes a single-file exe.
 
 .EXAMPLE
-    .\build.ps1                 # framework-dependent single exe (needs .NET 8 runtime on target)
-    .\build.ps1 -SelfContained  # portable exe, no .NET install needed on target (~70 MB larger)
-    .\build.ps1 -DebugBuild     # plain Debug build only, no publish
+    .\build.ps1                        # x64, framework-dependent (needs .NET 8 runtime on target) -> dist\
+    .\build.ps1 -SelfContained         # x64, portable exe, no .NET install needed (~150 MB)       -> dist\
+    .\build.ps1 -Arm64                 # Windows on ARM (Snapdragon etc.), framework-dependent    -> dist-arm64\
+    .\build.ps1 -Arm64 -SelfContained  # Windows on ARM, portable                                  -> dist-arm64\
+    .\build.ps1 -DebugBuild            # plain Debug build only, no publish
 #>
 param(
     [switch]$SelfContained,
+    [switch]$Arm64,
     [switch]$DebugBuild
 )
 
@@ -32,11 +35,16 @@ if ($DebugBuild) {
     exit 0
 }
 
+# x64 keeps the historical dist\ path (auto-start entries may point at it);
+# ARM64 gets its own folder so the two never overwrite each other.
+$rid    = if ($Arm64) { "win-arm64" } else { "win-x64" }
+$outDir = if ($Arm64) { "dist-arm64" } else { "dist" }
+
 $publishArgs = @(
     "publish", "ConnectionChecker.csproj",
     "-c", "Release",
-    "-r", "win-x64",
-    "-o", "dist",
+    "-r", $rid,
+    "-o", $outDir,
     "--nologo",
     "/p:PublishSingleFile=true",
     "/p:IncludeNativeLibrariesForSelfExtract=true",
@@ -46,6 +54,6 @@ $publishArgs = @(
 & $dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { throw "Publish failed." }
 
-$exe = Join-Path $PSScriptRoot "dist\PulseWatch.exe"
+$exe = Join-Path $PSScriptRoot "$outDir\PulseWatch.exe"
 $size = "{0:N1} MB" -f ((Get-Item $exe).Length / 1MB)
-Write-Host "`nPublished: $exe ($size)" -ForegroundColor Cyan
+Write-Host "`nPublished ($rid): $exe ($size)" -ForegroundColor Cyan

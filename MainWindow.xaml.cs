@@ -132,7 +132,7 @@ public partial class MainWindow : Window
         var icon = new WinForms.NotifyIcon
         {
             Icon = AppIcon.CreateTrayIcon(),
-            Text = "PULSE//WATCH — connection monitor",
+            Text = $"PULSE//WATCH {VersionTag}",
             Visible = true,
             ContextMenuStrip = menu
         };
@@ -213,14 +213,19 @@ public partial class MainWindow : Window
 
     private bool _trayShowsAlert;
 
+    // Version in the tooltip so it's always obvious WHICH build is running —
+    // a stale auto-started copy once masqueraded as a fixed one for days.
+    private static readonly string VersionTag =
+        $"v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?"}";
+
     /// <summary>Red ring while any active target is offline, cyan otherwise.</summary>
     private void UpdateTrayIcon()
     {
         var offline = _hosts.Count(h => h.Enabled && h.Status == HostStatus.Offline);
         var alert = offline > 0;
         _trayIcon.Text = alert
-            ? $"PULSE//WATCH — {offline} target{(offline == 1 ? "" : "s")} offline"
-            : "PULSE//WATCH — connection monitor";
+            ? $"PULSE//WATCH {VersionTag} — {offline} offline"
+            : $"PULSE//WATCH {VersionTag} — all targets up";
         if (alert == _trayShowsAlert) return;
 
         _trayShowsAlert = alert;
@@ -375,6 +380,7 @@ public partial class MainWindow : Window
             host.Address = dialog.Result.Address;
             host.CheckType = dialog.Result.CheckType;
             host.Port = dialog.Result.Port;
+            host.IpVersion = dialog.Result.IpVersion;
             host.IntervalSeconds = dialog.Result.IntervalSeconds;
             host.RetryCount = dialog.Result.RetryCount;
             host.TimeoutMs = dialog.Result.TimeoutMs;

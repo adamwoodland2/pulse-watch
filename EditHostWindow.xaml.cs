@@ -22,11 +22,7 @@ public partial class EditHostWindow : Window
         Icon = AppIcon.WindowIcon;
         _globalOffline = settings.OfflineTileColor;
         _globalOnline = settings.OnlineTileColor;
-        ValidationHelpers.MakeNumeric(PortBox);
-        ValidationHelpers.MakeNumeric(IntervalBox);
-        ValidationHelpers.MakeNumeric(RetryBox);
-        ValidationHelpers.MakeNumeric(TimeoutBox);
-        RefreshSwatches();
+        RefreshSwatches(); // NumberBox controls enforce digits-only themselves
     }
 
     public EditHostWindow(Services.AppSettings settings, HostEntry existing) : this(settings)
@@ -37,6 +33,7 @@ public partial class EditHostWindow : Window
         AddressBox.Text = existing.Address;
         TypeCombo.SelectedIndex = existing.CheckType == CheckType.Tcp ? 0 : 1;
         PortBox.Text = existing.Port.ToString();
+        IpVersionCombo.SelectedIndex = (int)existing.IpVersion;
         IntervalBox.Text = existing.IntervalSeconds.ToString();
         RetryBox.Text = existing.RetryCount.ToString();
         TimeoutBox.Text = existing.TimeoutMs.ToString();
@@ -136,6 +133,7 @@ public partial class EditHostWindow : Window
             Address = address,
             CheckType = isTcp ? CheckType.Tcp : CheckType.Icmp,
             Port = isTcp ? port : 443,
+            IpVersion = (IpVersion)Math.Clamp(IpVersionCombo.SelectedIndex, 0, 2),
             IntervalSeconds = interval,
             RetryCount = retries,
             TimeoutMs = timeout,

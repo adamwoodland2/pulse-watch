@@ -19,7 +19,6 @@ public partial class SettingsWindow : Window
         Icon = AppIcon.WindowIcon;
         _settings = settings;
 
-        ValidationHelpers.MakeNumeric(DurationBox);
         CloseToTrayCheck.IsChecked = settings.CloseToTray;
         ConfirmExitCheck.IsChecked = settings.ConfirmOnExit;
         AutoStartCheck.IsChecked = StartupService.IsEnabled();

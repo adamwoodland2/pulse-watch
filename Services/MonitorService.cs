@@ -25,6 +25,23 @@ public class MonitorService : IDisposable
     private readonly object _gate = new();
     private readonly Dictionary<Guid, CancellationTokenSource> _loops = new();
 
+    // Last address that worked per host: steady-state checks probe it with a
+    // single socket instead of re-resolving DNS and racing 4 candidates every
+    // check. With many targets that volume can exhaust home-router NAT tables
+    // and trip SYN-flood protection, degrading all other traffic.
+    private sealed record CachedRoute(string Address, IpVersion Version, IPAddress Ip, DateTime ResolvedAt);
+
+    private static IPAddress[] FilterFamily(IPAddress[] addresses, IpVersion version) => version switch
+    {
+        IpVersion.IPv4 => addresses.Where(a => a.AddressFamily == AddressFamily.InterNetwork).ToArray(),
+        IpVersion.IPv6 => addresses.Where(a => a.AddressFamily == AddressFamily.InterNetworkV6).ToArray(),
+        _ => addresses
+    };
+
+    private static string NoFamilyCode(IpVersion version) => version == IpVersion.IPv6 ? "NO V6" : "NO V4";
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, CachedRoute> _routes = new();
+    private static readonly TimeSpan RouteTtl = TimeSpan.FromMinutes(5);
+
     public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     public void Start(HostEntry host)
@@ -83,6 +100,19 @@ public class MonitorService : IDisposable
 
     private async Task RunLoopCoreAsync(HostEntry host, CancellationToken token)
     {
+        // De-phase the loops: many targets starting together would fire a
+        // burst of checks at t=0 and stay synchronized every interval,
+        // hammering the router with dozens of simultaneous SYNs.
+        var jitterMs = Random.Shared.Next(200, (int)Math.Min(host.IntervalSeconds * 1000L, 8000));
+        try
+        {
+            await Task.Delay(jitterMs, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
         while (!token.IsCancellationRequested)
         {
             var (isUp, latency, failure) = await CheckAsync(host, token);
@@ -135,19 +165,20 @@ public class MonitorService : IDisposable
         }
     }
 
-    private static async Task<(bool isUp, long latencyMs, string? failure)> CheckAsync(HostEntry host, CancellationToken token)
+    private async Task<(bool isUp, long latencyMs, string? failure)> CheckAsync(HostEntry host, CancellationToken token)
     {
         var timeoutMs = Math.Clamp(host.TimeoutMs, 100, 60000);
         try
         {
             // Tokens like {gateway} re-resolve every check, so switching
             // networks is picked up automatically.
-            var address = NetworkTokens.Resolve(host.Address);
-            if (address == null) return (false, -1, "NO NET");
+            var address = NetworkTokens.Resolve(host.Address, host.IpVersion);
+            if (address == null)
+                return (false, -1, host.IpVersion == IpVersion.Auto ? "NO NET" : NoFamilyCode(host.IpVersion));
 
             return host.CheckType == CheckType.Icmp
-                ? await PingAsync(address, timeoutMs, token)
-                : await TcpAsync(address, host.Port, timeoutMs, token);
+                ? await PingAsync(address, host.IpVersion, timeoutMs, token)
+                : await TcpAsync(host, address, timeoutMs, token);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
@@ -175,10 +206,28 @@ public class MonitorService : IDisposable
         }
     }
 
-    private static async Task<(bool, long, string?)> PingAsync(string address, int timeoutMs, CancellationToken token)
+    private static async Task<(bool, long, string?)> PingAsync(string address, IpVersion version, int timeoutMs, CancellationToken token)
     {
         using var ping = new Ping();
-        var reply = await ping.SendPingAsync(address, TimeSpan.FromMilliseconds(timeoutMs), cancellationToken: token);
+        using var budgetCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        budgetCts.CancelAfter(timeoutMs);
+
+        PingReply reply;
+        if (version == IpVersion.Auto)
+        {
+            // Let the OS pick (usually IPv6 if there's an AAAA) — current behaviour.
+            reply = await ping.SendPingAsync(address, TimeSpan.FromMilliseconds(timeoutMs), cancellationToken: budgetCts.Token);
+        }
+        else
+        {
+            var addresses = IPAddress.TryParse(address, out var literal)
+                ? new[] { literal }
+                : await Dns.GetHostAddressesAsync(address, budgetCts.Token);
+            var candidates = FilterFamily(addresses, version);
+            if (candidates.Length == 0) return (false, -1, NoFamilyCode(version));
+            reply = await ping.SendPingAsync(candidates[0], TimeSpan.FromMilliseconds(timeoutMs), cancellationToken: budgetCts.Token);
+        }
+
         return reply.Status switch
         {
             IPStatus.Success => (true, reply.RoundtripTime, null),
@@ -191,29 +240,57 @@ public class MonitorService : IDisposable
         };
     }
 
-    // Happy-eyeballs-style connect: multi-homed hosts (CDNs) can have one dead
-    // address cached first in DNS; trying only that one burns the whole timeout
-    // even though the host is fine. Race up to 4 candidates (IPv6/IPv4
-    // interleaved, 300 ms stagger) and take the first that connects.
-    private static async Task<(bool, long, string?)> TcpAsync(string address, int port, int timeoutMs, CancellationToken token)
+    private async Task<(bool, long, string?)> TcpAsync(HostEntry host, string address, int timeoutMs, CancellationToken token)
     {
-        // The timeout budget covers DNS resolution too, so a slow resolver
-        // can't stretch a check past the configured per-host timeout.
-        using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-        raceCts.CancelAfter(timeoutMs);
+        var port = host.Port;
 
+        // One budget covers everything (DNS included), so a slow resolver or a
+        // dead cached address can't stretch a check past the per-host timeout.
+        using var budgetCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        budgetCts.CancelAfter(timeoutMs);
+
+        // Fast path: single socket to the address that worked last time.
+        // Capped at half the budget so a newly-dead address still leaves the
+        // full race time to find a live one below.
+        if (_routes.TryGetValue(host.Id, out var route) &&
+            route.Address == address &&
+            route.Version == host.IpVersion &&
+            DateTime.UtcNow - route.ResolvedAt < RouteTtl)
+        {
+            using var quickCts = CancellationTokenSource.CreateLinkedTokenSource(budgetCts.Token);
+            quickCts.CancelAfter(Math.Max(500, timeoutMs / 2));
+            try
+            {
+                var (latency, _) = await AttemptConnectAsync(route.Ip, port, 0, quickCts.Token);
+                return (true, latency, null);
+            }
+            catch (Exception) when (!token.IsCancellationRequested)
+            {
+                _routes.TryRemove(host.Id, out _); // cached address went bad — fall through to the race
+            }
+        }
+
+        // Full path: resolve and race up to 4 candidates (IPv6/IPv4
+        // interleaved, 300 ms stagger). Multi-homed hosts (CDNs) can have one
+        // dead address listed first in DNS; trying only that one would burn
+        // the whole timeout even though the host is fine.
         var addresses = System.Net.IPAddress.TryParse(address, out var literal)
             ? new[] { literal }
-            : await Dns.GetHostAddressesAsync(address, raceCts.Token);
+            : await Dns.GetHostAddressesAsync(address, budgetCts.Token);
+        if (addresses.Length == 0) return (false, -1, "DNS");
+
+        // Forced family: only that family's addresses (a literal of the other
+        // family, or a name with no such record, reports NO V4 / NO V6).
+        addresses = FilterFamily(addresses, host.IpVersion);
+        if (addresses.Length == 0) return (false, -1, NoFamilyCode(host.IpVersion));
 
         var candidates = Interleave(
                 addresses.Where(a => a.AddressFamily == AddressFamily.InterNetworkV6),
                 addresses.Where(a => a.AddressFamily == AddressFamily.InterNetwork))
             .Take(4).ToArray();
-        if (candidates.Length == 0) return (false, -1, "DNS");
 
         var attempts = candidates
-            .Select((addr, i) => AttemptConnectAsync(addr, port, i * 300, raceCts.Token))
+            .Select((addr, i) => AttemptConnectAsync(addr, port, i * 300, budgetCts.Token))
             .ToList();
 
         Exception? lastRealError = null;
@@ -223,10 +300,11 @@ public class MonitorService : IDisposable
             attempts.Remove(done);
             try
             {
-                var latency = await done;
-                raceCts.Cancel();
+                var (latency, winner) = await done;
+                budgetCts.Cancel();
                 foreach (var loser in attempts)
                     _ = loser.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+                _routes[host.Id] = new CachedRoute(address, host.IpVersion, winner, DateTime.UtcNow);
                 return (true, latency, null);
             }
             catch (OperationCanceledException)
@@ -243,7 +321,7 @@ public class MonitorService : IDisposable
         throw new OperationCanceledException(); // every attempt timed out
     }
 
-    private static async Task<long> AttemptConnectAsync(System.Net.IPAddress addr, int port, int delayMs, CancellationToken token)
+    private static async Task<(long latencyMs, IPAddress addr)> AttemptConnectAsync(IPAddress addr, int port, int delayMs, CancellationToken token)
     {
         if (delayMs > 0) await Task.Delay(delayMs, token);
         // Abortive close (RST) instead of FIN: probe sockets exchange no data,
@@ -255,7 +333,7 @@ public class MonitorService : IDisposable
         socket.LingerState = new LingerOption(enable: true, seconds: 0);
         var sw = Stopwatch.StartNew();
         await socket.ConnectAsync(addr, port, token);
-        return sw.ElapsedMilliseconds;
+        return (sw.ElapsedMilliseconds, addr);
     }
 
     private static IEnumerable<T> Interleave<T>(IEnumerable<T> first, IEnumerable<T> second)

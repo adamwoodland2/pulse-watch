@@ -353,6 +353,36 @@
                 </Style.Triggers>
             </Style>
 
+            <!-- Chevron buttons for NumberBox spinners -->
+            <Style x:Key="SpinButton" TargetType="RepeatButton">
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="IsTabStop" Value="False"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Delay" Value="350"/>
+                <Setter Property="Interval" Value="60"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RepeatButton">
+                            <Border x:Name="bd" Background="Transparent" Padding="4,3">
+                                <Path x:Name="chev"
+                                      Data="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.5"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="chev" Property="Stroke" Value="{StaticResource AccentBrush}"/>
+                                    <Setter TargetName="bd" Property="Background" Value="#1400E5FF"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="#3300E5FF"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="FieldLabel" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
                 <Setter Property="FontSize" Value="11"/>

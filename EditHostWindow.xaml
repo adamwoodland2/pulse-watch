@@ -1,6 +1,7 @@
 <Window x:Class="ConnectionChecker.EditHostWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ConnectionChecker"
         Title="Target"
         Width="420" SizeToContent="Height"
         Background="{StaticResource BgBrush}"
@@ -32,8 +33,10 @@
             <Grid Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="12"/>
-                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="100"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
@@ -47,8 +50,16 @@
 
                 <StackPanel Grid.Column="2" x:Name="PortPanel">
                     <TextBlock Text="PORT" Style="{StaticResource FieldLabel}"/>
-                    <TextBox x:Name="PortBox" Style="{StaticResource NeonTextBox}"
-                             Text="443" FontFamily="Consolas"/>
+                    <local:NumberBox x:Name="PortBox" Text="443" Minimum="1" Maximum="65535"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="4">
+                    <TextBlock Text="IP VERSION" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox x:Name="IpVersionCombo" Style="{StaticResource NeonCombo}">
+                        <ComboBoxItem Content="Auto" IsSelected="True"/>
+                        <ComboBoxItem Content="IPv4"/>
+                        <ComboBoxItem Content="IPv6"/>
+                    </ComboBox>
                 </StackPanel>
             </Grid>
 
@@ -63,20 +74,17 @@
 
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="INTERVAL (S)" Style="{StaticResource FieldLabel}"/>
-                    <TextBox x:Name="IntervalBox" Style="{StaticResource NeonTextBox}"
-                             Text="30" FontFamily="Consolas"/>
+                    <local:NumberBox x:Name="IntervalBox" Text="30" Minimum="1" Maximum="86400"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
                     <TextBlock Text="RETRIES" Style="{StaticResource FieldLabel}"/>
-                    <TextBox x:Name="RetryBox" Style="{StaticResource NeonTextBox}"
-                             Text="1" FontFamily="Consolas"/>
+                    <local:NumberBox x:Name="RetryBox" Text="1" Minimum="0" Maximum="10"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="4">
                     <TextBlock Text="TIMEOUT (MS)" Style="{StaticResource FieldLabel}"/>
-                    <TextBox x:Name="TimeoutBox" Style="{StaticResource NeonTextBox}"
-                             Text="4000" FontFamily="Consolas"/>
+                    <local:NumberBox x:Name="TimeoutBox" Text="4000" Minimum="100" Maximum="60000" Step="100"/>
                 </StackPanel>
             </Grid>
 

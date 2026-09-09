@@ -10,6 +10,13 @@ public enum CheckType
     Tcp
 }
 
+public enum IpVersion
+{
+    Auto,
+    IPv4,
+    IPv6
+}
+
 public enum HostStatus
 {
     Unknown,
@@ -23,6 +30,7 @@ public class HostEntry : INotifyPropertyChanged
     private string _address = "";
     private CheckType _checkType = CheckType.Icmp;
     private int _port = 443;
+    private IpVersion _ipVersion = IpVersion.Auto;
     private int _intervalSeconds = 30;
     private bool _playSound = true;
     private bool _enabled = true;
@@ -57,6 +65,13 @@ public class HostEntry : INotifyPropertyChanged
     {
         get => _port;
         set { _port = value; OnPropertyChanged(); OnPropertyChanged(nameof(ModeDisplay)); }
+    }
+
+    /// <summary>Auto = race whatever resolves (IPv6 first); IPv4/IPv6 = that family only.</summary>
+    public IpVersion IpVersion
+    {
+        get => _ipVersion;
+        set { _ipVersion = value; OnPropertyChanged(); OnPropertyChanged(nameof(ModeDisplay)); }
     }
 
     public int IntervalSeconds
@@ -128,7 +143,9 @@ public class HostEntry : INotifyPropertyChanged
     }
 
     [JsonIgnore]
-    public string ModeDisplay => CheckType == CheckType.Icmp ? "ICMP" : $"TCP:{Port}";
+    public string ModeDisplay =>
+        (CheckType == CheckType.Icmp ? "ICMP" : $"TCP:{Port}") +
+        IpVersion switch { IpVersion.IPv4 => " v4", IpVersion.IPv6 => " v6", _ => "" };
 
     [JsonIgnore]
     public string StatusDisplay => !Enabled ? "PAUSED" : Status switch
