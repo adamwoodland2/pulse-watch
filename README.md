@@ -2,6 +2,17 @@
 
 WPF (.NET 8) connection monitor for Windows. Checks hosts/IPs by ICMP ping or TCP port on a per-target interval and pops slide-in alert tiles at the screen edge when a target goes down (red) or recovers (green). Runs from the tray.
 
+![Main window — target list with live status, latency or failure code, and a paused row](docs/main-window.png)
+
+Alert tiles slide in at the screen edge and dismiss themselves (this one uses a per-target orange override for "down"):
+
+![Alert tiles — TARGET DOWN and TARGET RESTORED](docs/alert-tiles.png)
+
+<p>
+  <img src="docs/edit-target.png" alt="Add/Edit target dialog" width="48%">
+  <img src="docs/settings.png" alt="Settings dialog" width="48%">
+</p>
+
 ## Run
 
 ```
@@ -14,6 +25,7 @@ or build and launch `bin\Debug\net8.0-windows\PulseWatch.exe`. See **Build** for
 
 - `--minimized` (or `/min`) — start hidden in the tray; monitoring and alerts run as normal.
 - `--monitor N` (also `--monitor=N`, `/monitor:2`) — show alert tiles on screen N (1-based, as listed by Windows). Invalid/missing N falls back to the primary screen.
+- `--settings <file>` (also `--settings=<file>`) — use a different settings file instead of `%APPDATA%\PulseWatch\settings.json`, e.g. for a separate profile or a portable copy. Only one instance runs per user regardless of the file.
 
 ## Targets
 

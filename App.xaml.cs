@@ -10,6 +10,9 @@ public partial class App : System.Windows.Application
     /// <summary>1-based monitor for the alert overlay (--monitor N); null = primary.</summary>
     public static int? MonitorOverride { get; private set; }
 
+    /// <summary>Alternate settings file (--settings path); null = %APPDATA%\PulseWatch\settings.json.</summary>
+    public static string? SettingsFile { get; private set; }
+
     private Mutex? _instanceMutex;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -53,6 +56,19 @@ public partial class App : System.Windows.Application
                     : (i + 1 < args.Length ? args[++i] : "");
                 if (int.TryParse(value, out var n) && n >= 1)
                     MonitorOverride = n;
+            }
+            else if (arg.StartsWith("settings"))
+            {
+                // Accept "--settings C:\x.json" or "--settings=C:\x.json"; the raw arg keeps its case.
+                var raw = args[i].TrimStart('-', '/');
+                var value = raw.Length > "settings".Length
+                    ? raw["settings".Length..].TrimStart('=', ':')
+                    : (i + 1 < args.Length ? args[++i] : "");
+                if (value.Length > 0)
+                {
+                    SettingsFile = value;
+                    Services.SettingsService.UseFile(value);
+                }
             }
         }
     }

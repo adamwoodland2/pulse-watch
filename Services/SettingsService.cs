@@ -21,10 +21,17 @@ public class AppSettings
 
 public static class SettingsService
 {
-    public static readonly string Dir =
+    public static string Dir { get; private set; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PulseWatch");
 
-    private static readonly string FilePath = Path.Combine(Dir, "settings.json");
+    public static string FilePath { get; private set; } = Path.Combine(Dir, "settings.json");
+
+    /// <summary>Use a different settings file (the --settings switch). Call before anything loads.</summary>
+    public static void UseFile(string path)
+    {
+        FilePath = Path.GetFullPath(path);
+        Dir = Path.GetDirectoryName(FilePath) ?? Dir;
+    }
 
     private static readonly JsonSerializerOptions Options = new()
     {
