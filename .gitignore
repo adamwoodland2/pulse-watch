@@ -12,3 +12,4 @@ dist-arm64/
 
 # Logs and temp
 *.log
+release/
