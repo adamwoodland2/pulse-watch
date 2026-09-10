@@ -66,7 +66,8 @@ public partial class MainWindow : Window
                 HideToTray();
         };
 
-        _overlay.Show(); // not tied to Loaded: must run even when starting minimized
+        // The overlay shows itself on the first tile and hides when empty,
+        // so it's never on screen (or in the way) while nothing is alerting.
 
         Closing += (_, e) =>
         {

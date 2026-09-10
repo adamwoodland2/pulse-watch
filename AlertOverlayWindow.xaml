@@ -10,9 +10,12 @@
         ShowActivated="False"
         Focusable="False"
         ResizeMode="NoResize"
+        SizeToContent="Height"
         FontFamily="Segoe UI">
 
-    <!-- Transparent pixels are click-through; only the tiles themselves take clicks. -->
+    <!-- The window is only as tall as its tiles and is hidden when there are
+         none: a permanent full-height strip, even fully transparent, swallows
+         mouse input in DirectX games running maximised-windowed. -->
     <ScrollViewer VerticalScrollBarVisibility="Hidden" Focusable="False">
         <StackPanel x:Name="AlertHost" Width="340" Margin="0,16,16,16"
                     HorizontalAlignment="Right" VerticalAlignment="Top"/>

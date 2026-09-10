@@ -84,14 +84,14 @@ public partial class AlertOverlayWindow : Window
             var wa = screens[n - 1].WorkingArea;
             double scale = PresentationSource.FromVisual(this)?.CompositionTarget
                 ?.TransformFromDevice.M11 ?? GetDipScale();
-            Height = wa.Height * scale;
+            MaxHeight = wa.Height * scale;
             Left = (wa.Right * scale) - Width;
             Top = wa.Top * scale;
             return;
         }
 
         var area = SystemParameters.WorkArea;
-        Height = area.Height;
+        MaxHeight = area.Height;
         Left = area.Right - Width;
         Top = area.Top;
     }
@@ -177,6 +177,7 @@ public partial class AlertOverlayWindow : Window
 
         tile.MouseLeftButtonUp += (_, _) => DismissTile(tile, host.Id);
         AlertHost.Children.Insert(0, tile);
+        if (!IsVisible) Show(); // ShowActivated=false + WS_EX_NOACTIVATE: never steals focus
 
         if (!isOnline)
         {
@@ -226,7 +227,11 @@ public partial class AlertOverlayWindow : Window
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
         };
         var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(260));
-        fadeOut.Completed += (_, _) => AlertHost.Children.Remove(tile);
+        fadeOut.Completed += (_, _) =>
+        {
+            AlertHost.Children.Remove(tile);
+            if (AlertHost.Children.Count == 0) Hide(); // no tiles = no window = no dead zone
+        };
         tile.RenderTransform.BeginAnimation(TranslateTransform.XProperty, slideOut);
         tile.BeginAnimation(OpacityProperty, fadeOut);
     }
