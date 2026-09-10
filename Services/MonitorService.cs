@@ -206,26 +206,32 @@ public class MonitorService : IDisposable
         }
     }
 
+    // Uses the synchronous Ping.Send on a pool thread, NOT SendPingAsync: on
+    // Windows the async implementation leaks exactly one kernel handle per
+    // call (reclaimed only by a GC, which this low-allocation app rarely
+    // triggers), measured at ~1 handle/ping regardless of instance reuse.
+    // Send() is bounded by Ping's own timeout, so the blocked thread is short-lived.
     private static async Task<(bool, long, string?)> PingAsync(string address, IpVersion version, int timeoutMs, CancellationToken token)
     {
         using var ping = new Ping();
-        using var budgetCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-        budgetCts.CancelAfter(timeoutMs);
 
         PingReply reply;
         if (version == IpVersion.Auto)
         {
             // Let the OS pick (usually IPv6 if there's an AAAA) — current behaviour.
-            reply = await ping.SendPingAsync(address, TimeSpan.FromMilliseconds(timeoutMs), cancellationToken: budgetCts.Token);
+            reply = await Task.Run(() => ping.Send(address, timeoutMs), token);
         }
         else
         {
+            using var dnsCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            dnsCts.CancelAfter(timeoutMs);
             var addresses = IPAddress.TryParse(address, out var literal)
                 ? new[] { literal }
-                : await Dns.GetHostAddressesAsync(address, budgetCts.Token);
+                : await Dns.GetHostAddressesAsync(address, dnsCts.Token);
             var candidates = FilterFamily(addresses, version);
             if (candidates.Length == 0) return (false, -1, NoFamilyCode(version));
-            reply = await ping.SendPingAsync(candidates[0], TimeSpan.FromMilliseconds(timeoutMs), cancellationToken: budgetCts.Token);
+            var target = candidates[0];
+            reply = await Task.Run(() => ping.Send(target, timeoutMs), token);
         }
 
         return reply.Status switch
