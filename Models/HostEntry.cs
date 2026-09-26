@@ -7,7 +7,16 @@ namespace ConnectionChecker.Models;
 public enum CheckType
 {
     Icmp,
-    Tcp
+    Tcp,
+    Http,
+    Https,
+    Dns
+}
+
+public enum DnsRecordType
+{
+    A,
+    AAAA
 }
 
 public enum IpVersion
@@ -30,6 +39,10 @@ public class HostEntry : INotifyPropertyChanged
     private string _address = "";
     private CheckType _checkType = CheckType.Icmp;
     private int _port = 443;
+    private string _path = "/";
+    private bool _ignoreCertErrors;
+    private string _dnsServer = "{dns}";
+    private DnsRecordType _dnsRecordType = DnsRecordType.A;
     private IpVersion _ipVersion = IpVersion.Auto;
     private int _intervalSeconds = 30;
     private bool _playSound = true;
@@ -67,6 +80,34 @@ public class HostEntry : INotifyPropertyChanged
         set { _port = value; OnPropertyChanged(); OnPropertyChanged(nameof(ModeDisplay)); }
     }
 
+    /// <summary>HTTP(S) only: path (and optional query) requested, always starting with '/'.</summary>
+    public string Path
+    {
+        get => _path;
+        set { _path = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>HTTPS only: accept invalid/self-signed/expired certificates. Off by default.</summary>
+    public bool IgnoreCertErrors
+    {
+        get => _ignoreCertErrors;
+        set { _ignoreCertErrors = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>DNS only: the server to ask (IP, host name, or {dns}/{gateway}); Address is the name looked up.</summary>
+    public string DnsServer
+    {
+        get => _dnsServer;
+        set { _dnsServer = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>DNS only: record type that must come back for the check to pass.</summary>
+    public DnsRecordType DnsRecordType
+    {
+        get => _dnsRecordType;
+        set { _dnsRecordType = value; OnPropertyChanged(); }
+    }
+
     /// <summary>Auto = race whatever resolves (IPv6 first); IPv4/IPv6 = that family only.</summary>
     public IpVersion IpVersion
     {
@@ -100,7 +141,7 @@ public class HostEntry : INotifyPropertyChanged
         set { _retryCount = value; OnPropertyChanged(); }
     }
 
-    /// <summary>Per-check timeout in milliseconds (ICMP reply / TCP connect).</summary>
+    /// <summary>Per-check timeout in milliseconds (ICMP reply / TCP connect / HTTP response headers / DNS answer).</summary>
     public int TimeoutMs
     {
         get => _timeoutMs;
@@ -144,7 +185,14 @@ public class HostEntry : INotifyPropertyChanged
 
     [JsonIgnore]
     public string ModeDisplay =>
-        (CheckType == CheckType.Icmp ? "ICMP" : $"TCP:{Port}") +
+        CheckType switch
+        {
+            CheckType.Icmp => "ICMP",
+            CheckType.Http => Port == 80 ? "HTTP" : $"HTTP:{Port}",
+            CheckType.Https => Port == 443 ? "HTTPS" : $"HTTPS:{Port}",
+            CheckType.Dns => Port == 53 ? "DNS" : $"DNS:{Port}",
+            _ => $"TCP:{Port}"
+        } +
         IpVersion switch { IpVersion.IPv4 => " v4", IpVersion.IPv6 => " v6", _ => "" };
 
     [JsonIgnore]

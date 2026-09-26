@@ -52,6 +52,43 @@ public static class ValidationHelpers
     }
 
     /// <summary>
+    /// Normalizes an HTTP path (and optional query): blank -> "/", adds the
+    /// leading '/' if missing. Returns null when it contains whitespace.
+    /// </summary>
+    public static string? NormalizePath(string? input)
+    {
+        var path = (input ?? "").Trim();
+        if (path.Any(char.IsWhiteSpace)) return null;
+        return path.StartsWith('/') ? path : "/" + path;
+    }
+
+    /// <summary>
+    /// Normalizes a domain name to look up: trims, drops a trailing dot, and
+    /// converts international names to their ASCII (punycode) form. Returns
+    /// null unless every label is 1-63 letters/digits/'-'/'_' and the whole
+    /// name fits DNS's 253-character limit. IP literals are rejected: they
+    /// aren't names to look up.
+    /// </summary>
+    public static string? NormalizeDnsName(string? input)
+    {
+        var name = (input ?? "").Trim().TrimEnd('.');
+        if (name.Length == 0) return null;
+        try
+        {
+            name = new System.Globalization.IdnMapping().GetAscii(name).ToLowerInvariant();
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+        if (name.Length > 253 || System.Net.IPAddress.TryParse(name, out _)) return null;
+        return name.Split('.').All(label => label.Length is >= 1 and <= 63 &&
+                                            label.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+            ? name
+            : null;
+    }
+
+    /// <summary>
     /// Normalizes and validates a host/IP. Extracts the host from a pasted URL
     /// ("https://example.com/x" -> "example.com"). Returns null when invalid.
     /// </summary>
@@ -71,6 +108,17 @@ public static class ValidationHelpers
         }
 
         if (address.Any(char.IsWhiteSpace)) return null;
+
+        // IPv6 literals in their standard form: "[2606:4700::1111]" (as a URL
+        // gives it) loses the brackets, an empty "%" scope is dropped, and a
+        // real scope ("fe80::1%8", needed for link-local) is kept.
+        if (address.Contains(':'))
+        {
+            return System.Net.IPAddress.TryParse(address, out var ip) &&
+                   ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6
+                ? ip.ToString()
+                : null; // a colon anywhere else can't be a valid host
+        }
 
         // Accepts DNS names, IPv4, and IPv6. Underscore hostnames (seen in the
         // wild on Windows networks) fail CheckHostName, so allow those too.

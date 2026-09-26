@@ -52,7 +52,13 @@ public static class SettingsService
                 var json = File.ReadAllText(FilePath);
                 var loaded = JsonSerializer.Deserialize<AppSettings>(json, Options);
                 if (loaded != null)
-                    return Sanitize(loaded);
+                {
+                    var problems = new List<string>();
+                    var result = Sanitize(loaded, problems);
+                    if (problems.Count > 0)
+                        warning = string.Join(Environment.NewLine + Environment.NewLine, problems);
+                    return result;
+                }
             }
             catch
             {
@@ -81,8 +87,12 @@ public static class SettingsService
         };
     }
 
-    /// <summary>Clamps and repairs hand-edited or partially damaged values so they can't crash the app.</summary>
-    private static AppSettings Sanitize(AppSettings s)
+    /// <summary>
+    /// Clamps and repairs hand-edited or partially damaged values so they can't
+    /// crash the app. Anything that can't be repaired is paused and described in
+    /// <paramref name="problems"/>.
+    /// </summary>
+    private static AppSettings Sanitize(AppSettings s, List<string> problems)
     {
         s.AlertDurationSeconds = Math.Clamp(s.AlertDurationSeconds, 1, 3600);
         if (ValidationHelpers.ParseColor(s.OfflineTileColor ?? "") == null) s.OfflineTileColor = AppSettings.DefaultOfflineColor;
@@ -102,6 +112,22 @@ public static class SettingsService
             h.Name ??= "";
             h.Address ??= "";
             h.Port = Math.Clamp(h.Port, 1, 65535);
+            h.Path = ValidationHelpers.NormalizePath(h.Path) ?? "/";
+            h.DnsServer = ValidationHelpers.NormalizeHost(h.DnsServer ?? "") ?? "{dns}";
+            if (h.CheckType == CheckType.Dns)
+            {
+                // Same rule as the dialog; the address goes into the query as-is.
+                if (ValidationHelpers.NormalizeDnsName(h.Address) is string dnsName)
+                {
+                    h.Address = dnsName;
+                }
+                else
+                {
+                    if (h.Enabled)
+                        problems.Add($"DNS target \"{h.Name}\" has an invalid name to look up (\"{h.Address}\"), so it has been paused. Edit it to fix.");
+                    h.Enabled = false;
+                }
+            }
             h.IntervalSeconds = Math.Clamp(h.IntervalSeconds, 1, 86400);
             h.RetryCount = Math.Clamp(h.RetryCount, 0, 10);
             h.TimeoutMs = Math.Clamp(h.TimeoutMs, 100, 60000);

@@ -374,13 +374,23 @@ public partial class MainWindow : Window
         if (HostList.SelectedItem is not HostEntry host) return;
 
         var dialog = new EditHostWindow(_settings, host) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Result != null)
+        if (dialog.ShowDialog() != true) return;
+
+        if (dialog.RemoveRequested)
+        {
+            RemoveHost(host);
+        }
+        else if (dialog.Result != null)
         {
             _monitor.Stop(host.Id); // stop the old loop before mutating shared state
             host.Name = dialog.Result.Name;
             host.Address = dialog.Result.Address;
             host.CheckType = dialog.Result.CheckType;
             host.Port = dialog.Result.Port;
+            host.Path = dialog.Result.Path;
+            host.IgnoreCertErrors = dialog.Result.IgnoreCertErrors;
+            host.DnsServer = dialog.Result.DnsServer;
+            host.DnsRecordType = dialog.Result.DnsRecordType;
             host.IpVersion = dialog.Result.IpVersion;
             host.IntervalSeconds = dialog.Result.IntervalSeconds;
             host.RetryCount = dialog.Result.RetryCount;
@@ -406,8 +416,12 @@ public partial class MainWindow : Window
 
     private void Remove_Click(object sender, RoutedEventArgs e)
     {
-        if (HostList.SelectedItem is not HostEntry host) return;
+        if (HostList.SelectedItem is HostEntry host)
+            RemoveHost(host);
+    }
 
+    private void RemoveHost(HostEntry host)
+    {
         _monitor.Stop(host.Id);
         _hosts.Remove(host);
         _overlay.DismissTilesFor(host.Id);

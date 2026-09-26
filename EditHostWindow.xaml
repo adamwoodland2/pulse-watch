@@ -3,140 +3,339 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:ConnectionChecker"
         Title="Target"
-        Width="420" SizeToContent="Height"
+        Width="500" SizeToContent="Height"
         Background="{StaticResource BgBrush}"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         FontFamily="Segoe UI"
         ShowInTaskbar="False">
 
-    <Border Padding="24">
-        <StackPanel>
-            <TextBlock x:Name="HeaderText" Text="ADD TARGET"
-                       Foreground="{StaticResource AccentBrush}"
-                       FontFamily="Consolas" FontSize="16" FontWeight="Bold"
-                       Margin="0,0,0,18"/>
+    <Window.Resources>
+        <!-- Section heading: accent caption with a hairline running to the edge. -->
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Opacity" Value="0.85"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SectionRule" TargetType="Border">
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+        </Style>
 
-            <CheckBox x:Name="ActiveCheck" Style="{StaticResource NeonCheck}"
-                      Content="Active — untick to pause checks for this target"
-                      IsChecked="True" Margin="0,0,0,16"/>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
 
-            <TextBlock Text="DISPLAY NAME" Style="{StaticResource FieldLabel}"/>
-            <TextBox x:Name="NameBox" Style="{StaticResource NeonTextBox}" Margin="0,0,0,14"/>
+        <!-- Check-method segmented bar: one RadioButton per method. -->
+        <Style x:Key="Segment" TargetType="RadioButton">
+            <Setter Property="GroupName" Value="Method"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" Background="Transparent" BorderBrush="Transparent"
+                                BorderThickness="1" CornerRadius="2" Padding="0,7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="bd" Property="Background" Value="#1A00E5FF"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="bd" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#00E5FF" BlurRadius="10" ShadowDepth="0" Opacity="0.35"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-            <TextBlock Text="HOST / IP ADDRESS" Style="{StaticResource FieldLabel}"/>
-            <TextBox x:Name="AddressBox" Style="{StaticResource NeonTextBox}"
-                     FontFamily="Consolas"/>
-            <TextBlock Text="Special values: {gateway} = default gateway, {dns} = DNS server"
-                       Foreground="{StaticResource TextDimBrush}" FontSize="11" Margin="0,4,0,14"/>
+        <!-- Neutral button, so red stays reserved for REMOVE. -->
+        <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource NeonButton}">
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource TextDimBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#18213A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
-            <Grid Margin="0,0,0,14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="80"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="100"/>
-                </Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="CHECK METHOD" Style="{StaticResource FieldLabel}"/>
-                    <ComboBox x:Name="TypeCombo" Style="{StaticResource NeonCombo}"
-                              SelectionChanged="TypeCombo_SelectionChanged">
-                        <ComboBoxItem Content="TCP port" IsSelected="True"/>
-                        <ComboBoxItem Content="ICMP ping"/>
-                    </ComboBox>
-                </StackPanel>
+        <!-- Scrolls only when the screen is too short for the whole form (the
+             window is capped to the work area in code); the footer stays put. -->
+        <ScrollViewer x:Name="FormScroller" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled" Focusable="False"
+                      ScrollChanged="FormScroller_ScrollChanged">
+            <StackPanel Margin="24,22,24,0">
+                <!-- ===== Header ===== -->
+                <Grid Margin="0,0,0,18">
+                    <TextBlock x:Name="HeaderText" Text="ADD TARGET"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontFamily="Consolas" FontSize="16" FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <CheckBox x:Name="ActiveCheck" Style="{StaticResource NeonCheck}"
+                              Content="Active" IsChecked="True"
+                              HorizontalAlignment="Right" VerticalAlignment="Center"
+                              ToolTip="Untick to pause checks and alerts for this target"/>
+                </Grid>
 
-                <StackPanel Grid.Column="2" x:Name="PortPanel">
-                    <TextBlock Text="PORT" Style="{StaticResource FieldLabel}"/>
-                    <local:NumberBox x:Name="PortBox" Text="443" Minimum="1" Maximum="65535"/>
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="3*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="DISPLAY NAME" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="NameBox" Style="{StaticResource NeonTextBox}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock x:Name="AddressLabel" Text="HOST / IP ADDRESS" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="AddressBox" Style="{StaticResource NeonTextBox}" FontFamily="Consolas"/>
+                    </StackPanel>
+                </Grid>
+                <TextBlock x:Name="AddressHint" Style="{StaticResource Hint}" Margin="0,5,0,0"
+                           Text="{}{gateway} = default gateway  ·  {dns} = DNS server  ·  pasted URLs are fine"/>
 
-                <StackPanel Grid.Column="4">
-                    <TextBlock Text="IP VERSION" Style="{StaticResource FieldLabel}"/>
-                    <ComboBox x:Name="IpVersionCombo" Style="{StaticResource NeonCombo}">
-                        <ComboBoxItem Content="Auto" IsSelected="True"/>
-                        <ComboBoxItem Content="IPv4"/>
-                        <ComboBoxItem Content="IPv6"/>
-                    </ComboBox>
-                </StackPanel>
-            </Grid>
+                <!-- ===== Check ===== -->
+                <Grid Margin="0,20,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="CHECK" Style="{StaticResource SectionTitle}"/>
+                    <Border Style="{StaticResource SectionRule}"/>
+                </Grid>
 
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <Border Background="#0C1220" BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="3" Padding="3">
+                    <UniformGrid Rows="1">
+                        <RadioButton x:Name="TcpRadio" Content="TCP" Style="{StaticResource Segment}"
+                                     IsChecked="True" Checked="Method_Checked"/>
+                        <RadioButton x:Name="IcmpRadio" Content="PING" Style="{StaticResource Segment}"
+                                     Checked="Method_Checked"/>
+                        <RadioButton x:Name="HttpRadio" Content="HTTP" Style="{StaticResource Segment}"
+                                     Checked="Method_Checked"/>
+                        <RadioButton x:Name="HttpsRadio" Content="HTTPS" Style="{StaticResource Segment}"
+                                     Checked="Method_Checked"/>
+                        <RadioButton x:Name="DnsRadio" Content="DNS" Style="{StaticResource Segment}"
+                                     Checked="Method_Checked"/>
+                    </UniformGrid>
+                </Border>
 
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="INTERVAL (S)" Style="{StaticResource FieldLabel}"/>
-                    <local:NumberBox x:Name="IntervalBox" Text="30" Minimum="1" Maximum="86400"/>
-                </StackPanel>
+                <!-- Options for the selected method only. -->
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="3" Padding="14,12,14,12" Margin="0,8,0,0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <StackPanel x:Name="PortPanel" Width="96" Margin="0,0,12,0">
+                                <TextBlock Text="PORT" Style="{StaticResource FieldLabel}"/>
+                                <local:NumberBox x:Name="PortBox" Text="443" Minimum="1" Maximum="65535"/>
+                            </StackPanel>
+                            <StackPanel Width="110">
+                                <TextBlock Text="IP VERSION" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox x:Name="IpVersionCombo" Style="{StaticResource NeonCombo}"
+                                          Height="{Binding ActualHeight, ElementName=TimeoutBox}">
+                                    <ComboBoxItem Content="Auto" IsSelected="True"/>
+                                    <ComboBoxItem Content="IPv4"/>
+                                    <ComboBoxItem Content="IPv6"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel x:Name="RecordPanel" Width="96" Margin="12,0,0,0" Visibility="Collapsed">
+                                <TextBlock Text="RECORD" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox x:Name="RecordCombo" Style="{StaticResource NeonCombo}"
+                                          Height="{Binding ActualHeight, ElementName=TimeoutBox}">
+                                    <ComboBoxItem Content="A" IsSelected="True"/>
+                                    <ComboBoxItem Content="AAAA"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </StackPanel>
 
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="RETRIES" Style="{StaticResource FieldLabel}"/>
-                    <local:NumberBox x:Name="RetryBox" Text="1" Minimum="0" Maximum="10"/>
-                </StackPanel>
+                        <StackPanel x:Name="PathPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                            <TextBlock Text="PATH" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="PathBox" Style="{StaticResource NeonTextBox}" FontFamily="Consolas" Text="/"/>
+                        </StackPanel>
 
-                <StackPanel Grid.Column="4">
-                    <TextBlock Text="TIMEOUT (MS)" Style="{StaticResource FieldLabel}"/>
-                    <local:NumberBox x:Name="TimeoutBox" Text="4000" Minimum="100" Maximum="60000" Step="100"/>
-                </StackPanel>
-            </Grid>
+                        <StackPanel x:Name="DnsServerPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                            <TextBlock Text="DNS SERVER" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="DnsServerBox" Style="{StaticResource NeonTextBox}" FontFamily="Consolas" Text="{}{dns}"/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,5,0,0"
+                                       Text="{}{dns} = your network's server  ·  {gateway} = your router  ·  or an IP like 1.1.1.1"/>
+                        </StackPanel>
 
-            <CheckBox x:Name="SoundCheck" Style="{StaticResource NeonCheck}"
-                      Content="Play a subtle ping when an alert appears"
-                      IsChecked="True" Margin="0,14,0,0"/>
+                        <CheckBox x:Name="IgnoreCertCheck" Style="{StaticResource NeonCheck}"
+                                  Content="Ignore certificate errors (self-signed, expired, wrong name)"
+                                  Margin="0,12,0,0" Visibility="Collapsed"/>
 
-            <TextBlock Text="TILE COLOURS (BLANK = USE GLOBAL SETTING)" Style="{StaticResource FieldLabel}"
-                       Margin="0,16,0,6"/>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="60"/>
-                    <ColumnDefinition Width="110"/>
-                    <ColumnDefinition Width="40"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                </Grid.RowDefinitions>
+                        <TextBlock x:Name="MethodHint" Style="{StaticResource Hint}" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Offline" Foreground="{StaticResource TextBrush}"
-                           FontSize="12" VerticalAlignment="Center"/>
-                <TextBox Grid.Row="0" Grid.Column="1" x:Name="OfflineColorBox" Style="{StaticResource NeonTextBox}"
-                         FontFamily="Consolas" TextChanged="ColorBox_TextChanged"/>
-                <Border Grid.Row="0" Grid.Column="2" x:Name="OfflineSwatch" Width="26" Height="26" CornerRadius="3"
-                        Margin="8,0,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                        Cursor="Hand" ToolTip="Click to pick a colour"
-                        MouseLeftButtonUp="OfflineSwatch_Click"/>
+                <!-- ===== Timing ===== -->
+                <Grid Margin="0,20,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="TIMING" Style="{StaticResource SectionTitle}"/>
+                    <Border Style="{StaticResource SectionRule}"/>
+                </Grid>
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Online" Foreground="{StaticResource TextBrush}"
-                           FontSize="12" VerticalAlignment="Center" Margin="0,10,0,0"/>
-                <TextBox Grid.Row="1" Grid.Column="1" x:Name="OnlineColorBox" Style="{StaticResource NeonTextBox}"
-                         FontFamily="Consolas" Margin="0,10,0,0" TextChanged="ColorBox_TextChanged"/>
-                <Border Grid.Row="1" Grid.Column="2" x:Name="OnlineSwatch" Width="26" Height="26" CornerRadius="3"
-                        Margin="8,10,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                        Cursor="Hand" ToolTip="Click to pick a colour"
-                        MouseLeftButtonUp="OnlineSwatch_Click"/>
-            </Grid>
-            <TextBlock Text="Click a swatch to pick a colour."
-                       Foreground="{StaticResource TextDimBrush}" FontSize="11" Margin="0,6,0,0"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-            <TextBlock x:Name="ErrorText" Foreground="{StaticResource OfflineBrush}"
-                       FontSize="12" Margin="0,12,0,0" TextWrapping="Wrap"
-                       Visibility="Collapsed"/>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="INTERVAL (S)" Style="{StaticResource FieldLabel}"/>
+                        <local:NumberBox x:Name="IntervalBox" Text="30" Minimum="1" Maximum="86400"/>
+                    </StackPanel>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
-                <Button Content="SAVE" Style="{StaticResource NeonButton}"
-                        Click="Save_Click" IsDefault="True"/>
-                <Button Content="CANCEL" Style="{StaticResource DangerButton}" Margin="10,0,0,0"
-                        Click="Cancel_Click" IsCancel="True"/>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="RETRIES" Style="{StaticResource FieldLabel}"/>
+                        <local:NumberBox x:Name="RetryBox" Text="1" Minimum="0" Maximum="10"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="TIMEOUT (MS)" Style="{StaticResource FieldLabel}"/>
+                        <local:NumberBox x:Name="TimeoutBox" Text="4000" Minimum="100" Maximum="60000" Step="100"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ===== Alerts ===== -->
+                <Grid Margin="0,20,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="ALERTS" Style="{StaticResource SectionTitle}"/>
+                    <Border Style="{StaticResource SectionRule}"/>
+                </Grid>
+
+                <CheckBox x:Name="SoundCheck" Style="{StaticResource NeonCheck}"
+                          Content="Play a subtle ping when an alert appears"
+                          IsChecked="True" Margin="0,0,0,12"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="OFFLINE TILE" Style="{StaticResource FieldLabel}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="OfflineColorBox" Style="{StaticResource NeonTextBox}"
+                                     FontFamily="Consolas" TextChanged="ColorBox_TextChanged"/>
+                            <TextBlock x:Name="OfflinePlaceholder" Text="global" Style="{StaticResource Hint}"
+                                       FontFamily="Consolas" FontSize="13" Margin="11,0,0,0"
+                                       VerticalAlignment="Center" IsHitTestVisible="False"/>
+                            <Border Grid.Column="1" x:Name="OfflineSwatch" Width="33" CornerRadius="3"
+                                    Margin="6,0,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                    Cursor="Hand" ToolTip="Click to pick a colour. Blank box = the colour from Settings."
+                                    MouseLeftButtonUp="OfflineSwatch_Click"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="ONLINE TILE" Style="{StaticResource FieldLabel}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="OnlineColorBox" Style="{StaticResource NeonTextBox}"
+                                     FontFamily="Consolas" TextChanged="ColorBox_TextChanged"/>
+                            <TextBlock x:Name="OnlinePlaceholder" Text="global" Style="{StaticResource Hint}"
+                                       FontFamily="Consolas" FontSize="13" Margin="11,0,0,0"
+                                       VerticalAlignment="Center" IsHitTestVisible="False"/>
+                            <Border Grid.Column="1" x:Name="OnlineSwatch" Width="33" CornerRadius="3"
+                                    Margin="6,0,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                    Cursor="Hand" ToolTip="Click to pick a colour. Blank box = the colour from Settings."
+                                    MouseLeftButtonUp="OnlineSwatch_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </StackPanel>
-        </StackPanel>
-    </Border>
+        </ScrollViewer>
+
+        <Border x:Name="FooterBar" Grid.Row="1" Padding="24,0,24,24"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0">
+            <StackPanel>
+                <TextBlock x:Name="ErrorText" Foreground="{StaticResource OfflineBrush}"
+                           FontSize="12" Margin="0,14,0,0" TextWrapping="Wrap"
+                           Visibility="Collapsed"/>
+
+                <!-- ===== Footer ===== -->
+                <Grid Margin="0,22,0,0">
+                    <Button x:Name="RemoveButton" Content="REMOVE" Style="{StaticResource DangerButton}"
+                            HorizontalAlignment="Left" Click="Remove_Click" Visibility="Collapsed"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="SAVE" Style="{StaticResource NeonButton}"
+                                Click="Save_Click" IsDefault="True"/>
+                        <Button Content="CANCEL" Style="{StaticResource GhostButton}" Margin="10,0,0,0"
+                                Click="Cancel_Click" IsCancel="True"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
 </Window>

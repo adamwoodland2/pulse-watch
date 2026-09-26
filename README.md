@@ -1,6 +1,6 @@
 # PULSE//WATCH
 
-WPF (.NET 8) connection monitor for Windows. Checks hosts/IPs by ICMP ping or TCP port on a per-target interval and pops slide-in alert tiles at the screen edge when a target goes down (red) or recovers (green). Runs from the tray.
+WPF (.NET 8) connection monitor for Windows. Checks hosts/IPs by ICMP ping, TCP port, HTTP/HTTPS request, or DNS lookup on a per-target interval and pops slide-in alert tiles at the screen edge when a target goes down (red) or recovers (green). Runs from the tray.
 
 ![Main window — target list with live status, latency or failure code, and a paused row](docs/main-window.png)
 
@@ -36,20 +36,20 @@ Only one instance runs per user; a second launch shows a notice and exits.
 
 ## Targets
 
-Each target has: name, address, check method (TCP port / ICMP ping), IP version, interval, retries, timeout, active flag, optional alert sound, optional tile colours.
+Each target has: name, address, check method (TCP / PING / HTTP / HTTPS / DNS), IP version, interval, retries, timeout, active flag, optional alert sound, optional tile colours. HTTP(S) targets add a path and the ignore-certificate-errors option; DNS targets add the DNS server to ask and the record type. Double-click a row (or EDIT) to change a target; REMOVE is in the dialog too, and needs a second click within 3 s to confirm.
 
-**Address** can be a hostname, an IPv4/IPv6 literal, a pasted URL (the host is extracted), or a token:
+**Address** (for DNS targets: the domain name to look up) can be a hostname, an IPv4/IPv6 literal (saved in standard form: brackets dropped, a link-local `%scope` kept), a pasted URL (the host is extracted; for HTTP/HTTPS targets the scheme, port and path are taken from it too), or a token:
 
 | Token | Resolves to (re-evaluated every check, so switching networks is picked up) |
 |---|---|
-| `{gateway}` | the default gateway |
-| `{dns}` | the first DNS server |
+| `{gateway}` | the default gateway (IPv6: usually link-local `fe80::…%scope`) |
+| `{dns}` | the first DNS server, taken from adapters that have a gateway first, so VMware/WSL/Hyper-V adapters and Windows' `fec0:0:0:ffff::` placeholder servers are never picked |
 
 **IP version** controls which address family is probed. Default is Auto, which behaves as the app always has:
 
 | IP version | Hostname | IP literal | `{gateway}` / `{dns}` |
 |---|---|---|---|
-| **Auto** | TCP: resolves A+AAAA and races candidates, IPv6 first (see below); whichever connects wins. ICMP: whatever the OS resolver lists first (usually IPv6 if there is an AAAA). | that family | IPv4 if present, else IPv6 |
+| **Auto** | TCP/HTTP/HTTPS: resolves A+AAAA and races candidates, IPv6 first (see below); whichever connects wins. ICMP and DNS: whatever the OS resolver lists first (usually IPv6 if there is an AAAA). | that family | IPv4 if present, else IPv6 |
 | **IPv4** | A records only | must be IPv4, else `NO V4` | the IPv4 gateway/DNS, else `NO V4` |
 | **IPv6** | AAAA records only | must be IPv6, else `NO V6` | the IPv6 gateway/DNS (usually link-local `fe80::…`), else `NO V6` |
 
@@ -61,8 +61,21 @@ A forced-family row is the way to watch one path explicitly — e.g. two rows, "
 
 **TCP checks.** A probe is a plain TCP connect to the port — no data is sent.
 - *Sticky route:* the address that connected last time is remembered (5 min) and steady-state checks open exactly one socket to it, with no DNS query.
-- *Race on failure / first check / expiry:* the name is resolved and up to 4 candidate addresses are tried, IPv6/IPv4 interleaved with a 300 ms stagger; the first to connect wins and becomes the sticky route. This stops one dead CDN address (listed first in DNS) from burning the whole timeout even though the host is fine; the race cancels the losers as soon as one connects. The target's IP version setting decides which addresses are eligible.
+- *Race on failure / first check / expiry:* the name is resolved and up to 4 candidate addresses are tried, IPv6/IPv4 interleaved, Happy Eyeballs style (RFC 8305): each attempt gets a 300 ms head start before the next joins, but one that fails (e.g. IPv6 with no route) hands over immediately, so a dead family costs nothing; the first to connect wins and becomes the sticky route. This stops one dead CDN address (listed first in DNS) from burning the whole timeout even though the host is fine; the race cancels the losers as soon as one connects. The target's IP version setting decides which addresses are eligible.
 - *Socket close:* probe sockets are closed abortively (RST, `SO_LINGER` = 0) rather than with a FIN handshake. Because no data was exchanged there is nothing to flush, and a graceful close would leave one `TIME_WAIT` entry per check on the machine for 30–120 s.
+
+**HTTP/HTTPS checks.** A `GET` for the target's path (default `/`, query strings allowed) on the target's port (default 80 / 443).
+- *Up* means any response status below 400. The path is sent exactly as entered on the target's own host, so a path starting with `//` can't redirect the Host header or certificate check to another name. Redirects are not followed — a 3xx proves this server answered, and following it could end up measuring a different host. Only the response headers are waited for; the body is never downloaded.
+- *Connection:* opened with the same sticky-route / race / RST-close logic as TCP checks, so the IP version setting applies and no `TIME_WAIT` entries pile up. Each check uses a fresh connection (no keep-alive) and ignores any system proxy, so it tests the real path every time. Latency is connect + TLS + time to response headers.
+- *Certificates:* validated normally. **Ignore certificate errors** (HTTPS only, off by default) accepts self-signed, expired or wrong-name certificates — handy for a router admin page (`{gateway}`) or a LAN device on an IP address.
+
+**DNS checks.** Looks up the target's address (a domain name, e.g. `www.google.com`) by sending its own query by UDP straight to the chosen DNS server (port 53 by default), so Windows' resolver cache is never involved. This catches "online, but nothing loads because DNS is broken", which ICMP or TCP:53 to the same server can't: those only prove the server is reachable.
+- *Up* means the server answered with a record of the chosen type (A or AAAA, class IN, correct size) owned by the name asked for or by the end of its CNAME chain. A record for some other name elsewhere in the answer doesn't count.
+- *Validation:* the query ID is cryptographically random, and a reply is only accepted if it is a standard response echoing the exact question; anything else is ignored. A reply that matches but is malformed reports `BADREPLY`.
+- *Truncated answers* (TC flag) are retried over TCP within the remaining timeout, as the DNS spec intends; TC on its own proves nothing.
+- *Retransmit:* UDP can lose packets, so the query is resent every second until the timeout.
+- *Server:* `{dns}` (the default) for whatever server your network hands out, `{gateway}` for your router, an IP such as `1.1.1.1`, or a name such as `dns.google` (resolved by Windows, first address of the chosen family).
+- International names are converted to punycode (`bücher.de` → `xn--bcher-kva.de`). On load, a DNS target whose name isn't a valid domain (e.g. hand-edited to an IP) is paused with a warning.
 
 **ICMP checks.** One echo request with a 32-byte payload (the .NET/Windows `ping` default) per check. Auto lets the OS choose the family; IPv4/IPv6 resolve the name and ping the first address of that family. Pings use the synchronous API on a pool thread on purpose — the async one leaks a kernel handle per call on Windows.
 
@@ -70,13 +83,21 @@ A forced-family row is the way to watch one path explicitly — e.g. two rows, "
 
 | Code | Meaning |
 |---|---|
-| `TIMEOUT` | no reply / handshake within the timeout |
-| `REFUSED` | host answered but the port is closed (host is alive) |
+| `TIMEOUT` | no reply / handshake / HTTP response headers / DNS answer within the timeout |
+| `REFUSED` | host answered but the port is closed (host is alive); for DNS also the server refusing the query |
 | `DNS` | name did not resolve |
 | `UNREACH` | network/host unreachable (a router said no route) |
 | `RESET` / `TTL` / `FAIL` | connection reset / TTL expired / other |
 | `NO V4` / `NO V6` | forced family, but the target has no address of that family |
 | `NO NET` | a `{gateway}`/`{dns}` token has no address right now |
+| `HTTP 503` etc. | HTTP/HTTPS: the server answered with a status of 400 or above |
+| `CERT` | HTTPS: certificate rejected (untrusted, expired, or wrong name); see *Ignore certificate errors* |
+| `TLS` | HTTPS: TLS handshake failed for another reason (e.g. no TLS version or cipher in common) |
+| `NXDOMAIN` | DNS: the server says the name doesn't exist |
+| `SERVFAIL` | DNS: the server failed to resolve it (often its upstream is down) |
+| `NODATA` | DNS: the name exists but has no record of the chosen type (e.g. AAAA on an IPv4-only name) |
+| `BADREPLY` | DNS: the server's reply was malformed, or still truncated over TCP |
+| `BAD NAME` | DNS: the name to look up isn't a valid domain (normally caught when saving or loading) |
 
 ## Alerts and the tray
 

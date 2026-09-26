@@ -34,8 +34,16 @@ public static class NetworkTokens
             var all = NetworkInterface.GetAllNetworkInterfaces()
                 .Where(n => n.OperationalStatus == OperationalStatus.Up &&
                             n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                .SelectMany(n => selector(n.GetIPProperties()))
-                .Where(a => !IPAddress.Any.Equals(a) && !IPAddress.IPv6Any.Equals(a))
+                .Select(n => n.GetIPProperties())
+                // Interfaces with a default gateway first (stable sort keeps
+                // Windows' order otherwise): virtual adapters such as VMware
+                // and WSL/Hyper-V have none, and must not supply {dns}.
+                .OrderByDescending(p => p.GatewayAddresses.Any(g => !IsUnspecified(g.Address)))
+                .SelectMany(selector)
+                // fec0:0:0:ffff::1-3 are Windows' placeholder DNS servers on
+                // adapters with no IPv6 DNS configured; site-local is deprecated
+                // and never a real server.
+                .Where(a => !IsUnspecified(a) && !a.IsIPv6SiteLocal)
                 .ToList();
 
             var v4 = all.Where(a => a.AddressFamily == AddressFamily.InterNetwork);
@@ -56,4 +64,6 @@ public static class NetworkTokens
             return null;
         }
     }
+
+    private static bool IsUnspecified(IPAddress a) => IPAddress.Any.Equals(a) || IPAddress.IPv6Any.Equals(a);
 }
