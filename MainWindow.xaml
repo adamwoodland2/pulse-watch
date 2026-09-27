@@ -113,9 +113,13 @@
                     </TextBlock>
                 </StackPanel>
 
-                <Button Content="⚙ SETTINGS" Style="{StaticResource NeonButton}"
-                        HorizontalAlignment="Right" VerticalAlignment="Center"
-                        Click="Settings_Click"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Content="HISTORY" Style="{StaticResource NeonButton}"
+                            ToolTip="When targets went offline and came back, since the app started"
+                            Click="History_Click"/>
+                    <Button Content="⚙ SETTINGS" Style="{StaticResource NeonButton}" Margin="10,0,0,0"
+                            Click="Settings_Click"/>
+                </StackPanel>
             </Grid>
         </Border>
 

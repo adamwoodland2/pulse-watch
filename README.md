@@ -101,14 +101,26 @@ A forced-family row is the way to watch one path explicitly — e.g. two rows, "
 
 ## Alerts and the tray
 
-- Tiles slide in at the right edge of the chosen screen in a small always-on-top overlay that exists only while tiles are showing and is sized to them — nothing sits over your desktop or games the rest of the time. They appear even when the app is minimised, never steal focus, and dismiss on click, after the alert timeout (default 10 s), or automatically when a downed target recovers. Alerts fire only on state transitions, not on every failed check.
+- Tiles slide in at the right edge of the chosen screen (or the left edge; see Settings) in a small always-on-top overlay that exists only while tiles are showing and is sized to them — nothing sits over your desktop or games the rest of the time. They appear even when the app is minimised, never steal focus, and dismiss on click, after the alert timeout (default 10 s), or automatically when a downed target recovers. Alerts fire only on state transitions, not on every failed check.
 - A subtle two-note ping plays with each tile (per-target setting; falling for down, rising for recovery).
-- Tray icon: cyan ring when all active targets are up, red ring while any is offline; the tooltip shows the version and offline count. Right-click for Open, Mute alert sounds, Suppress tiles (off / until re-enabled / 1 m / 5 m / 15 m / 30 m / 1 h / 12 h — monitoring continues, only tiles are held), Exit.
+- Tray icon: cyan ring when all active targets are up, red ring while any is offline; the tooltip shows the version and offline count. Right-click for Open, History, Mute alert sounds, Suppress tiles (off / until re-enabled / 1 m / 5 m / 15 m / 30 m / 1 h / 12 h — monitoring continues, only tiles are held), Exit.
 - Minimising hides to the tray; with "X minimises to tray" on, closing does too.
+
+## History
+
+**HISTORY** (top right of the main window, or History in the tray menu) opens one list of every outage across all targets since the app started, newest first, updating live:
+
+![History — offline and recovery events with time, target, check type and failure reason](docs/history.png)
+
+- Logged: every time a target goes offline (including one that's already down on the first check), with the failure code as the reason, and every recovery from a logged outage. A target that simply starts online logs nothing.
+- Each row is a snapshot of the target's name and check type at that moment, so editing or removing a target keeps its past events.
+- Tile suppression doesn't affect it: outages are logged even while tiles are held.
+- **EXPORT CSV** saves `Date,Time,Target,Type,Event,Reason`, oldest first (UTF-8, opens cleanly in Excel).
+- Memory only, nothing written to disk: the history starts fresh each launch. The most recent 10,000 events are kept.
 
 ## Settings
 
-⚙ SETTINGS: X-minimises-to-tray, confirm-before-exit, auto-start at login (minimised), alert timeout, global tile colours (with picker), version/GitHub/licence. Everything — settings and targets — lives in one JSON file, `%APPDATA%\PulseWatch\settings.json` by default (Config Folder link on the main screen) or whatever `--settings` points at, for easy backup or moving between machines. Auto-start is the one setting kept in the registry instead, since it embeds the exe path.
+⚙ SETTINGS: X-minimises-to-tray, confirm-before-exit, auto-start at login (minimised), alert timeout, which side of the screen alert tiles appear on (right by default, or left), global tile colours (with picker), version/GitHub/licence. Everything — settings and targets — lives in one JSON file, `%APPDATA%\PulseWatch\settings.json` by default (Config Folder link on the main screen) or whatever `--settings` points at, for easy backup or moving between machines. Auto-start is the one setting kept in the registry instead, since it embeds the exe path.
 
 Loading is defensive: out-of-range numbers are clamped, invalid colours reset, duplicate target IDs regenerated, and an unreadable file is preserved as `settings.json.corrupt` with a warning. Saves are atomic.
 

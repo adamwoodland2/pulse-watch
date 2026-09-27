@@ -5,12 +5,20 @@ using ConnectionChecker.Models;
 
 namespace ConnectionChecker.Services;
 
+/// <summary>Which edge of the alert screen the tiles appear on.</summary>
+public enum AlertSide
+{
+    Right,
+    Left
+}
+
 public class AppSettings
 {
     public const string DefaultOfflineColor = "#FF3B5C";
     public const string DefaultOnlineColor = "#22E584";
 
     public int AlertDurationSeconds { get; set; } = 10;
+    public AlertSide AlertSide { get; set; } = AlertSide.Right;
     public bool CloseToTray { get; set; } = false;
     public bool ConfirmOnExit { get; set; } = true;
     public bool MuteSounds { get; set; }
@@ -95,6 +103,7 @@ public static class SettingsService
     private static AppSettings Sanitize(AppSettings s, List<string> problems)
     {
         s.AlertDurationSeconds = Math.Clamp(s.AlertDurationSeconds, 1, 3600);
+        if (!Enum.IsDefined(s.AlertSide)) s.AlertSide = AlertSide.Right; // e.g. a hand-edited number
         if (ValidationHelpers.ParseColor(s.OfflineTileColor ?? "") == null) s.OfflineTileColor = AppSettings.DefaultOfflineColor;
         if (ValidationHelpers.ParseColor(s.OnlineTileColor ?? "") == null) s.OnlineTileColor = AppSettings.DefaultOnlineColor;
 

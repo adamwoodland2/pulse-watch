@@ -33,6 +33,19 @@
                                  Minimum="1" Maximum="3600"/>
             </StackPanel>
 
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <TextBlock Text="Alert tiles appear on the" Foreground="{StaticResource TextBrush}"
+                           FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox x:Name="AlertSideCombo" Style="{StaticResource NeonCombo}" Width="90" Margin="10,0,10,0"
+                          Height="{Binding ActualHeight, ElementName=DurationBox}"
+                          ToolTip="The screen is the primary one, or the one chosen with --monitor N">
+                    <ComboBoxItem Content="Right" IsSelected="True"/>
+                    <ComboBoxItem Content="Left"/>
+                </ComboBox>
+                <TextBlock Text="side of the screen" Foreground="{StaticResource TextBrush}"
+                           FontSize="12" VerticalAlignment="Center"/>
+            </StackPanel>
+
             <!-- Tile colours -->
             <Border Background="{StaticResource BorderBrush}" Height="1" Margin="0,18,0,14"/>
             <TextBlock Text="TILE COLOURS" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>

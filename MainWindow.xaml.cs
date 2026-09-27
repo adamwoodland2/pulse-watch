@@ -17,6 +17,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<HostEntry> _hosts = new();
     private readonly MonitorService _monitor = new();
     private readonly AlertOverlayWindow _overlay = new();
+    private readonly HistoryLog _history = new();
+    private HistoryWindow? _historyWindow;
     private readonly WinForms.NotifyIcon _trayIcon;
     private AppSettings _settings = new();
     private bool _exiting;
@@ -29,7 +31,7 @@ public partial class MainWindow : Window
         Icon = AppIcon.WindowIcon;
 
         _settings = SettingsService.Load(out var loadWarning);
-        ApplyTileColors();
+        ApplyOverlaySettings();
         _overlay.Muted = _settings.MuteSounds;
 
         // Subscribe before any loop starts so a fast first check can't
@@ -112,6 +114,7 @@ public partial class MainWindow : Window
     {
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add("Open", null, (_, _) => RestoreFromTray());
+        menu.Items.Add("History", null, (_, _) => { RestoreFromTray(); ShowHistory(); });
 
         var mute = new WinForms.ToolStripMenuItem("Mute alert sounds")
         {
@@ -237,12 +240,29 @@ public partial class MainWindow : Window
 
     private void HideToTray() => Hide(); // to tray; the overlay keeps showing alerts
 
-    private void ApplyTileColors()
+    private void ApplyOverlaySettings()
     {
         if (ValidationHelpers.ParseColor(_settings.OfflineTileColor) is { } offline)
             _overlay.OfflineColor = offline;
         if (ValidationHelpers.ParseColor(_settings.OnlineTileColor) is { } online)
             _overlay.OnlineColor = online;
+        _overlay.OnLeft = _settings.AlertSide == AlertSide.Left;
+    }
+
+    private void History_Click(object sender, RoutedEventArgs e) => ShowHistory();
+
+    /// <summary>One history window at a time; a second request brings it forward.</summary>
+    private void ShowHistory()
+    {
+        if (_historyWindow != null)
+        {
+            if (_historyWindow.WindowState == WindowState.Minimized) _historyWindow.WindowState = WindowState.Normal;
+            _historyWindow.Activate();
+            return;
+        }
+        _historyWindow = new HistoryWindow(_history) { Owner = this };
+        _historyWindow.Closed += (_, _) => _historyWindow = null;
+        _historyWindow.Show();
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
@@ -250,7 +270,7 @@ public partial class MainWindow : Window
         var dialog = new SettingsWindow(_settings) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
-            ApplyTileColors();
+            ApplyOverlaySettings();
             SaveSettings();
         }
     }
@@ -447,6 +467,7 @@ public partial class MainWindow : Window
             if (!_monitor.IsCurrent(e.Host.Id, e.Token)) return;
 
             UpdateTrayIcon();
+            _history.Record(e.Host, e.NewStatus); // logged even while tiles are suppressed
 
             if (e.NewStatus == HostStatus.Offline)
             {

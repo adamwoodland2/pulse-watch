@@ -23,6 +23,7 @@ public partial class SettingsWindow : Window
         ConfirmExitCheck.IsChecked = settings.ConfirmOnExit;
         AutoStartCheck.IsChecked = StartupService.IsEnabled();
         DurationBox.Text = settings.AlertDurationSeconds.ToString();
+        AlertSideCombo.SelectedIndex = settings.AlertSide == AlertSide.Left ? 1 : 0;
         OfflineColorBox.Text = settings.OfflineTileColor;
         OnlineColorBox.Text = settings.OnlineTileColor;
 
@@ -102,6 +103,7 @@ public partial class SettingsWindow : Window
         _settings.CloseToTray = CloseToTrayCheck.IsChecked == true;
         _settings.ConfirmOnExit = ConfirmExitCheck.IsChecked == true;
         _settings.AlertDurationSeconds = secs;
+        _settings.AlertSide = AlertSideCombo.SelectedIndex == 1 ? AlertSide.Left : AlertSide.Right;
         _settings.OfflineTileColor = OfflineColorBox.Text.Trim();
         _settings.OnlineTileColor = OnlineColorBox.Text.Trim();
         DialogResult = true;

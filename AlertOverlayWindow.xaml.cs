@@ -18,9 +18,10 @@ using Rectangle = System.Windows.Shapes.Rectangle;
 namespace ConnectionChecker;
 
 /// <summary>
-/// Borderless, transparent, topmost strip pinned to the right edge of the
-/// primary screen. Hosts the alert tiles so they appear even when the main
-/// window is minimised or hidden to the tray.
+/// Borderless, transparent, topmost strip pinned to the right (or left, per
+/// Settings) edge of the alert screen: the primary, or --monitor N. Hosts the
+/// alert tiles so they appear even when the main window is minimised or
+/// hidden to the tray.
 /// </summary>
 public partial class AlertOverlayWindow : Window
 {
@@ -51,6 +52,28 @@ public partial class AlertOverlayWindow : Window
     /// <summary>Global mute (tray toggle): tiles still show, pings don't play.</summary>
     public bool Muted { get; set; }
 
+    private const double StripWidth = 380;
+    private bool _onLeft;
+
+    /// <summary>Dock to the left edge instead of the right. Applies to tiles already showing too.</summary>
+    public bool OnLeft
+    {
+        get => _onLeft;
+        set
+        {
+            if (_onLeft == value) return;
+            _onLeft = value;
+            // 16 px to the screen edge, the rest of the strip on the inner
+            // side leaves room for the tiles' glow.
+            AlertHost.HorizontalAlignment = value ? System.Windows.HorizontalAlignment.Left : System.Windows.HorizontalAlignment.Right;
+            AlertHost.Margin = value ? new Thickness(16, 16, 0, 16) : new Thickness(0, 16, 16, 16);
+            PositionOnScreen();
+        }
+    }
+
+    /// <summary>Where a tile sits before sliding in / after sliding out: just past the docked edge.</summary>
+    private double OffscreenX => _onLeft ? -StripWidth : StripWidth;
+
     public AlertOverlayWindow()
     {
         InitializeComponent();
@@ -72,7 +95,7 @@ public partial class AlertOverlayWindow : Window
 
     private void PositionOnScreen()
     {
-        Width = 380;
+        Width = StripWidth;
 
         // --monitor N picks a specific screen (1-based); out of range -> primary.
         var screens = System.Windows.Forms.Screen.AllScreens;
@@ -85,14 +108,14 @@ public partial class AlertOverlayWindow : Window
             double scale = PresentationSource.FromVisual(this)?.CompositionTarget
                 ?.TransformFromDevice.M11 ?? GetDipScale();
             MaxHeight = wa.Height * scale;
-            Left = (wa.Right * scale) - Width;
+            Left = _onLeft ? wa.Left * scale : (wa.Right * scale) - Width;
             Top = wa.Top * scale;
             return;
         }
 
         var area = SystemParameters.WorkArea;
         MaxHeight = area.Height;
-        Left = area.Right - Width;
+        Left = _onLeft ? area.Left : area.Right - Width;
         Top = area.Top;
     }
 
@@ -130,7 +153,7 @@ public partial class AlertOverlayWindow : Window
             CornerRadius = new CornerRadius(5),
             Margin = new Thickness(0, 0, 0, 10),
             Cursor = Cursors.Hand,
-            RenderTransform = new TranslateTransform(380, 0),
+            RenderTransform = new TranslateTransform(OffscreenX, 0),
             Opacity = 0,
             Effect = new DropShadowEffect { Color = accent, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.45 }
         };
@@ -186,7 +209,7 @@ public partial class AlertOverlayWindow : Window
             list.Add(tile);
         }
 
-        var slideIn = new DoubleAnimation(380, 0, TimeSpan.FromMilliseconds(380))
+        var slideIn = new DoubleAnimation(OffscreenX, 0, TimeSpan.FromMilliseconds(380))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
@@ -222,7 +245,7 @@ public partial class AlertOverlayWindow : Window
             if (list.Count == 0) _offlineTiles.Remove(id);
         }
 
-        var slideOut = new DoubleAnimation(0, 380, TimeSpan.FromMilliseconds(300))
+        var slideOut = new DoubleAnimation(0, OffscreenX, TimeSpan.FromMilliseconds(300))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
         };
